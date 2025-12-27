@@ -896,153 +896,152 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block font-semib
-<label className="block font-semibold mb-2">Hora Preferente</label>
-                                            <input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block font-semibold mb-2">Número de Mapa</label>
-                                        <input type="text" value={form.numeroMapa} onChange={(e) => setForm({ ...form, numeroMapa: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Ej: A-12" />
-                                    </div>
-                                    <div>
-                                        <label className="block font-semibold mb-2">Ubicación (GPS)</label>
-                                        <div className="flex gap-2 mb-2">
-                                            <input type="text" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Latitud" />
-                                            <input type="text" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Longitud" />
-                                        </div>
-                                        <button onClick={getUbicacion} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
-                                            📍 Usar Mi Ubicación Actual
-                                        </button>
-                                        <p className="text-xs text-gray-500 mt-2">💡 O copia las coordenadas desde Google Maps</p>
-                                    </div>
-                                    <div>
-                                        <label className="block font-semibold mb-2">Anotaciones</label>
-                                        <textarea value={form.anotaciones} onChange={(e) => setForm({ ...form, anotaciones: e.target.value })} className="w-full p-3 border rounded-lg" rows="4" placeholder="Notas..."></textarea>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={guardar} className="flex-1 bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 font-semibold">
-                                            💾 Guardar
-                                        </button>
-                                        <button onClick={() => setMostrar(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">
-                                            Cancelar
-                                        </button>
+                                            <label className="block font-semibold mb-2">Hora Preferente</label>
+<input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {interesados.length === 0 ? (
-                                    <div className="bg-gray-50 rounded-lg p-8 text-center">
-                                        <div className="text-6xl mb-4">👥</div>
-                                        <p className="text-gray-600">No hay interesados registrados</p>
-                                        <p className="text-gray-500 text-sm mt-2">Presiona el botón + para agregar</p>
+                                <div>
+                                    <label className="block font-semibold mb-2">Número de Mapa</label>
+                                    <input type="text" value={form.numeroMapa} onChange={(e) => setForm({ ...form, numeroMapa: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Ej: A-12" />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-2">Ubicación (GPS)</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input type="text" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Latitud" />
+                                        <input type="text" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Longitud" />
                                     </div>
-                                ) : (
-                                    interesados.map(int => (
-                                        <div key={int.id} className="bg-white rounded-lg p-5 shadow-md">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h3 className="text-lg font-bold">{int.nombre}</h3>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => abrir(int)} className="text-blue-500">✏️</button>
-                                                    <button onClick={() => eliminar(int.id)} className="text-red-500">🗑️</button>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2 text-sm text-gray-700">
-                                                {int.direccion && <p>📍 {int.direccion}</p>}
-                                                {int.fecha && <p>📅 {new Date(int.fecha + 'T00:00:00').toLocaleDateString('es-ES')}</p>}
-                                                {int.diaPreferente && <p>📆 {int.diaPreferente}{int.horaPreferente && ` - ${int.horaPreferente}`}</p>}
-                                                {int.numeroMapa && <p>📖 Mapa: {int.numeroMapa}</p>}
-                                                {int.anotaciones && <p className="mt-2 p-3 bg-gray-50 rounded">{int.anotaciones}</p>}
-                                                {int.lat && int.lng && (
-                                                    <button onClick={() => abrirMapa(int.lat, int.lng)} className="w-full mt-2 bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                                                        🗺️ Ver en Google Maps
-                                                    </button>
-                                                )}
+                                    <button onClick={getUbicacion} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
+                                        📍 Usar Mi Ubicación Actual
+                                    </button>
+                                    <p className="text-xs text-gray-500 mt-2">💡 O copia las coordenadas desde Google Maps</p>
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-2">Anotaciones</label>
+                                    <textarea value={form.anotaciones} onChange={(e) => setForm({ ...form, anotaciones: e.target.value })} className="w-full p-3 border rounded-lg" rows="4" placeholder="Notas..."></textarea>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={guardar} className="flex-1 bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 font-semibold">
+                                        💾 Guardar
+                                    </button>
+                                    <button onClick={() => setMostrar(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {interesados.length === 0 ? (
+                                <div className="bg-gray-50 rounded-lg p-8 text-center">
+                                    <div className="text-6xl mb-4">👥</div>
+                                    <p className="text-gray-600">No hay interesados registrados</p>
+                                    <p className="text-gray-500 text-sm mt-2">Presiona el botón + para agregar</p>
+                                </div>
+                            ) : (
+                                interesados.map(int => (
+                                    <div key={int.id} className="bg-white rounded-lg p-5 shadow-md">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h3 className="text-lg font-bold">{int.nombre}</h3>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => abrir(int)} className="text-blue-500">✏️</button>
+                                                <button onClick={() => eliminar(int.id)} className="text-red-500">🗑️</button>
                                             </div>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            return (
-                <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 shadow-lg">
-                        <div className="flex justify-between items-center">
-                            <h1 className="text-xl font-bold">Mi Predicación</h1>
-                            <button onClick={() => setMenu(!menu)} className="p-2 hover:bg-blue-500 rounded">
-                                {menu ? '✕' : '☰'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {menu && (
-                        <div className="bg-white shadow-lg">
-                            {[
-                                { name: 'Inicio', icon: '🏠', key: 'inicio' },
-                                { name: 'Mi Informe', icon: '📊', key: 'informe' },
-                                { name: 'Agenda Semanal', icon: '📅', key: 'agenda' },
-                                { name: 'Territorio', icon: '🗺️', key: 'territorio' },
-                                { name: 'Interesados', icon: '👥', key: 'interesados' }
-                            ].map(item => (
-                                <button
-                                    key={item.key}
-                                    onClick={() => { setTab(item.key); setMenu(false); }}
-                                    className="w-full text-left p-4 hover:bg-gray-100 border-b flex items-center gap-3"
-                                >
-                                    <span className="text-xl">{item.icon}</span>
-                                    <span className="font-semibold">{item.name}</span>
-                                </button>
-                            ))}
+                                        <div className="space-y-2 text-sm text-gray-700">
+                                            {int.direccion && <p>📍 {int.direccion}</p>}
+                                            {int.fecha && <p>📅 {new Date(int.fecha + 'T00:00:00').toLocaleDateString('es-ES')}</p>}
+                                            {int.diaPreferente && <p>📆 {int.diaPreferente}{int.horaPreferente && ` - ${int.horaPreferente}`}</p>}
+                                            {int.numeroMapa && <p>📖 Mapa: {int.numeroMapa}</p>}
+                                            {int.anotaciones && <p className="mt-2 p-3 bg-gray-50 rounded">{int.anotaciones}</p>}
+                                            {int.lat && int.lng && (
+                                                <button onClick={() => abrirMapa(int.lat, int.lng)} className="w-full mt-2 bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
+                                                    🗺️ Ver en Google Maps
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     )}
-
-                    <div className="pb-6">
-                        {tab === 'inicio' && (
-                            <Inicio
-                                nombre={nombre}
-                                foto={foto}
-                                salidas={salidas}
-                                informes={informes}
-                                interesados={interesados}
-                                metaMensual={metaMensual}
-                                setTab={setTab}
-                                editPerfil={editPerfil}
-                                setEditPerfil={setEditPerfil}
-                                savePerfil={savePerfil}
-                            />
-                        )}
-                        {tab === 'registro-rapido' && (
-                            <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />
-                        )}
-                        {tab === 'informe' && (
-                            <Informe
-                                informes={informes}
-                                saveInformes={saveInformes}
-                                metaAnual={metaAnual}
-                                metaMensual={metaMensual}
-                                saveMetas={saveMetas}
-                            />
-                        )}
-                        {tab === 'agenda' && (
-                            <Agenda salidas={salidas} saveSalidas={saveSalidas} />
-                        )}
-                        {tab === 'territorio' && (
-                            <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />
-                        )}
-                        {tab === 'interesados' && (
-                            <Interesados interesados={interesados} saveInteresados={saveInteresados} />
-                        )}
-                    </div>
                 </div>
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+        return (
+            <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 shadow-lg">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-xl font-bold">Mi Predicación</h1>
+                        <button onClick={() => setMenu(!menu)} className="p-2 hover:bg-blue-500 rounded">
+                            {menu ? '✕' : '☰'}
+                        </button>
+                    </div>
+                </div>
+
+                {menu && (
+                    <div className="bg-white shadow-lg">
+                        {[
+                            { name: 'Inicio', icon: '🏠', key: 'inicio' },
+                            { name: 'Mi Informe', icon: '📊', key: 'informe' },
+                            { name: 'Agenda Semanal', icon: '📅', key: 'agenda' },
+                            { name: 'Territorio', icon: '🗺️', key: 'territorio' },
+                            { name: 'Interesados', icon: '👥', key: 'interesados' }
+                        ].map(item => (
+                            <button
+                                key={item.key}
+                                onClick={() => { setTab(item.key); setMenu(false); }}
+                                className="w-full text-left p-4 hover:bg-gray-100 border-b flex items-center gap-3"
+                            >
+                                <span className="text-xl">{item.icon}</span>
+                                <span className="font-semibold">{item.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <div className="pb-6">
+                    {tab === 'inicio' && (
+                        <Inicio
+                            nombre={nombre}
+                            foto={foto}
+                            salidas={salidas}
+                            informes={informes}
+                            interesados={interesados}
+                            metaMensual={metaMensual}
+                            setTab={setTab}
+                            editPerfil={editPerfil}
+                            setEditPerfil={setEditPerfil}
+                            savePerfil={savePerfil}
+                        />
+                    )}
+                    {tab === 'registro-rapido' && (
+                        <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />
+                    )}
+                    {tab === 'informe' && (
+                        <Informe
+                            informes={informes}
+                            saveInformes={saveInformes}
+                            metaAnual={metaAnual}
+                            metaMensual={metaMensual}
+                            saveMetas={saveMetas}
+                        />
+                    )}
+                    {tab === 'agenda' && (
+                        <Agenda salidas={salidas} saveSalidas={saveSalidas} />
+                    )}
+                    {tab === 'territorio' && (
+                        <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />
+                    )}
+                    {tab === 'interesados' && (
+                        <Interesados interesados={interesados} saveInteresados={saveInteresados} />
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+</script>
 </body>
 </html>
