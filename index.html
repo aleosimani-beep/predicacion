@@ -113,6 +113,11 @@
                     .reduce((t, i) => t + i.horas, 0);
 
                 const restantes = metaMensual - horasMes;
+                const diasRestantes = (() => {
+                    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+                    return ultimoDia.getDate() - hoy.getDate() + 1;
+                })();
+                const horasPorDia = diasRestantes > 0 ? (restantes / diasRestantes) : 0;
 
                 const semana = (() => {
                     const dia = hoy.getDay();
@@ -137,10 +142,18 @@
                     const file = e.target.files[0];
                     if (file) {
                         const reader = new FileReader();
-                        reader.onload = (ev) => savePerfil(tempNombre, ev.target.result);
+                        reader.onload = (ev) => {
+                            const nuevaFoto = ev.target.result;
+                            setFoto(nuevaFoto);
+                            savePerfil(tempNombre, nuevaFoto);
+                        };
                         reader.readAsDataURL(file);
                     }
                 };
+
+                useEffect(() => {
+                    setTempNombre(nombre);
+                }, [nombre]);
 
                 return (
                     <div className="p-6">
@@ -181,9 +194,16 @@
                                     <div className="w-full bg-blue-700 rounded-full h-2">
                                         <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasMes / metaMensual) * 100, 100)}%` }}></div>
                                     </div>
-                                    <p className="text-sm text-blue-100 mt-1">
-                                        {restantes > 0 ? `Te faltan ${restantes.toFixed(1)} hrs` : '¡Meta alcanzada! 🎉'}
-                                    </p>
+                                    <div className="mt-2 space-y-1">
+                                        <p className="text-sm text-blue-100">
+                                            {restantes > 0 ? `Te faltan ${restantes.toFixed(1)} hrs` : '¡Meta alcanzada! 🎉'}
+                                        </p>
+                                        {restantes > 0 && diasRestantes > 0 && (
+                                            <p className="text-sm text-blue-100">
+                                                📅 Necesitas {horasPorDia.toFixed(1)} hrs/día para llegar
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -306,7 +326,8 @@
                     </div>
                 );
             };
- const RegistroRapido = ({ informes, saveInformes, setTab }) => {
+
+            const RegistroRapido = ({ informes, saveInformes, setTab }) => {
                 const hoy = new Date().toISOString().split('T')[0];
                 const inf = informes.find(i => i.fecha === hoy);
                 const [horas, setHoras] = useState(inf?.horas || 0);
@@ -366,8 +387,7 @@
                     </div>
                 );
             };
-
-            const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) => {
+const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) => {
                 const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
                 const [dia, setDia] = useState(new Date().getDate());
                 const [horas, setHoras] = useState(0);
@@ -375,6 +395,7 @@
                 const [editMetas, setEditMetas] = useState(false);
                 const [tempAnual, setTempAnual] = useState(metaAnual);
                 const [tempMensual, setTempMensual] = useState(metaMensual);
+                const [verHistorial, setVerHistorial] = useState(false);
 
                 const fecha = `${mes}-${String(dia).padStart(2, '0')}`;
                 const inf = informes.find(i => i.fecha === fecha);
@@ -415,94 +436,157 @@
                 const horasMes = informes.filter(i => i.fecha.startsWith(mes)).reduce((t, i) => t + i.horas, 0);
                 const diasMes = new Date(mes.split('-')[0], mes.split('-')[1], 0).getDate();
 
+                const mesesConActividad = (() => {
+                    const meses = {};
+                    informes.forEach(i => {
+                        const m = i.fecha.slice(0, 7);
+                        if (!meses[m]) meses[m] = { horas: 0, cursos: 0 };
+                        meses[m].horas += i.horas;
+                        meses[m].cursos += i.cursos;
+                    });
+                    return Object.keys(meses).sort().reverse().map(m => ({
+                        mes: m,
+                        nombre: new Date(m + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+                        ...meses[m]
+                    }));
+                })();
+
                 return (
                     <div className="p-6">
                         <h2 className="text-2xl font-bold mb-6">Mi Informe de Actividad</h2>
-                        <div className="bg-white rounded-lg p-6 shadow-md mb-6">
-                            <label className="block font-semibold mb-2">Mes</label>
-                            <input type="month" value={mes} onChange={(e) => { setMes(e.target.value); setDia(1); }} className="w-full p-3 border rounded-lg mb-4" />
-                            <label className="block font-semibold mb-2">Día</label>
-                            <select value={dia} onChange={(e) => setDia(parseInt(e.target.value))} className="w-full p-3 border rounded-lg mb-4">
-                                {Array.from({ length: diasMes }, (_, i) => (
-                                    <option key={i + 1} value={i + 1}>
-                                        {i + 1} - {new Date(mes + `-${String(i + 1).padStart(2, '0')}`).toLocaleDateString('es-ES', { weekday: 'long' })}
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="mt-4">
-                                <label className="block font-semibold mb-2">Horas</label>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-12 h-12 rounded-lg hover:bg-red-600 text-2xl">
-                                        −
-                                    </button>
-                                    <div className="flex-1 text-center">
-                                        <span className="text-4xl font-bold">{horas.toFixed(1)}</span>
-                                        <p className="text-gray-500 text-sm">horas</p>
-                                    </div>
-                                    <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-12 h-12 rounded-lg hover:bg-green-600 text-2xl">
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <label className="block font-semibold mb-2">Cursos Bíblicos</label>
-                                <input type="number" value={cursos} onChange={(e) => setCursos(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="0" />
-                            </div>
-                            <button onClick={guardar} className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
-                                💾 Guardar Informe
+
+                        <div className="mb-4">
+                            <button
+                                onClick={() => setVerHistorial(!verHistorial)}
+                                className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold"
+                            >
+                                {verHistorial ? '📝 Volver a Registrar' : '📊 Ver Historial de Meses'}
                             </button>
                         </div>
 
-                        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white shadow-md">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">Metas</h3>
-                                <button
-                                    onClick={() => {
-                                        if (editMetas) saveMetas(tempAnual, tempMensual);
-                                        setEditMetas(!editMetas);
-                                    }}
-                                    className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold"
-                                >
-                                    {editMetas ? 'Guardar' : 'Editar'}
-                                </button>
+                        {verHistorial ? (
+                            <div className="space-y-3">
+                                {mesesConActividad.length === 0 ? (
+                                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                                        <p className="text-gray-600">No hay informes registrados</p>
+                                    </div>
+                                ) : (
+                                    mesesConActividad.map((m, i) => (
+                                        <div key={i} className="bg-white rounded-lg p-5 shadow-md">
+                                            <h3 className="font-bold text-lg text-gray-800 capitalize mb-2">{m.nombre}</h3>
+                                            <div className="grid grid-cols-2 gap-4 text-center">
+                                                <div className="bg-blue-50 rounded-lg p-3">
+                                                    <p className="text-2xl font-bold text-blue-600">{m.horas.toFixed(1)}</p>
+                                                    <p className="text-sm text-gray-600">Horas</p>
+                                                </div>
+                                                <div className="bg-green-50 rounded-lg p-3">
+                                                    <p className="text-2xl font-bold text-green-600">{m.cursos}</p>
+                                                    <p className="text-sm text-gray-600">Cursos</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setMes(m.mes);
+                                                    setDia(1);
+                                                    setVerHistorial(false);
+                                                }}
+                                                className="w-full mt-3 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                                            >
+                                                Ver detalles
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                            {editMetas ? (
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-green-100 mb-1">Meta Anual (Sep-Sep)</label>
-                                        <input type="number" value={tempAnual} onChange={(e) => setTempAnual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-green-100 mb-1">Meta Mensual</label>
-                                        <input type="number" value={tempMensual} onChange={(e) => setTempMensual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-green-100 mb-1">Año de Servicio (Sep-Sep)</p>
-                                        <p className="text-3xl font-bold">{horasAnio.toFixed(1)} / {metaAnual} hrs</p>
-                                        <p className="text-green-100 mt-1">Restantes: {(metaAnual - horasAnio).toFixed(1)} hrs</p>
-                                        <div className="w-full bg-green-700 rounded-full h-2 mt-2">
-                                            <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasAnio / metaAnual) * 100, 100)}%` }}></div>
+                        ) : (
+                            <>
+                                <div className="bg-white rounded-lg p-6 shadow-md mb-6">
+                                    <label className="block font-semibold mb-2">Mes</label>
+                                    <input type="month" value={mes} onChange={(e) => { setMes(e.target.value); setDia(1); }} className="w-full p-3 border rounded-lg mb-4" />
+                                    <label className="block font-semibold mb-2">Día</label>
+                                    <select value={dia} onChange={(e) => setDia(parseInt(e.target.value))} className="w-full p-3 border rounded-lg mb-4">
+                                        {Array.from({ length: diasMes }, (_, i) => (
+                                            <option key={i + 1} value={i + 1}>
+                                                {i + 1} - {new Date(mes + `-${String(i + 1).padStart(2, '0')}`).toLocaleDateString('es-ES', { weekday: 'long' })}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="mt-4">
+                                        <label className="block font-semibold mb-2">Horas</label>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-12 h-12 rounded-lg hover:bg-red-600 text-2xl">
+                                                −
+                                            </button>
+                                            <div className="flex-1 text-center">
+                                                <span className="text-4xl font-bold">{horas.toFixed(1)}</span>
+                                                <p className="text-gray-500 text-sm">horas</p>
+                                            </div>
+                                            <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-12 h-12 rounded-lg hover:bg-green-600 text-2xl">
+                                                +
+                                            </button>
                                         </div>
                                     </div>
-                                    <div>
-                                        <p className="text-green-100 mb-1">Este Mes</p>
-                                        <p className="text-3xl font-bold">{horasMes.toFixed(1)} / {metaMensual} hrs</p>
-                                        <p className="text-green-100 mt-1">Restantes: {(metaMensual - horasMes).toFixed(1)} hrs</p>
-                                        <div className="w-full bg-green-700 rounded-full h-2 mt-2">
-                                            <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasMes / metaMensual) * 100, 100)}%` }}></div>
-                                        </div>
+                                    <div className="mt-4">
+                                        <label className="block font-semibold mb-2">Cursos Bíblicos</label>
+                                        <input type="number" value={cursos} onChange={(e) => setCursos(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="0" />
                                     </div>
+                                    <button onClick={guardar} className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
+                                        💾 Guardar Informe
+                                    </button>
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white shadow-md">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold">Metas</h3>
+                                        <button
+                                            onClick={() => {
+                                                if (editMetas) saveMetas(tempAnual, tempMensual);
+                                                setEditMetas(!editMetas);
+                                            }}
+                                            className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold"
+                                        >
+                                            {editMetas ? 'Guardar' : 'Editar'}
+                                        </button>
+                                    </div>
+                                    {editMetas ? (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-green-100 mb-1">Meta Anual (Sep-Ago)</label>
+                                                <input type="number" value={tempAnual} onChange={(e) => setTempAnual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-green-100 mb-1">Meta Mensual</label>
+                                                <input type="number" value={tempMensual} onChange={(e) => setTempMensual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-green-100 mb-1">Año de Servicio (Sep-Ago)</p>
+                                                <p className="text-3xl font-bold">{horasAnio.toFixed(1)} / {metaAnual} hrs</p>
+                                                <p className="text-green-100 mt-1">Restantes: {(metaAnual - horasAnio).toFixed(1)} hrs</p>
+                                                <div className="w-full bg-green-700 rounded-full h-2 mt-2">
+                                                    <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasAnio / metaAnual) * 100, 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-green-100 mb-1">Este Mes</p>
+                                                <p className="text-3xl font-bold">{horasMes.toFixed(1)} / {metaMensual} hrs</p>
+                                                <p className="text-green-100 mt-1">Restantes: {(metaMensual - horasMes).toFixed(1)} hrs</p>
+                                                <div className="w-full bg-green-700 rounded-full h-2 mt-2">
+                                                    <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasMes / metaMensual) * 100, 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 );
             };
 
-            const Salidas = ({ salidas, saveSalidas }) => {
+            const Agenda = ({ salidas, saveSalidas }) => {
                 const [editando, setEditando] = useState(null);
                 const [turno, setTurno] = useState(null);
                 const [form, setForm] = useState({ fecha: '', turno: 'mañana', hora: '', lugar: '', conductor: '', mapa: '' });
@@ -541,7 +625,7 @@
 
                 return (
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold mb-6">Salidas de la Semana</h2>
+                        <h2 className="text-2xl font-bold mb-6">📅 Agenda Semanal</h2>
                         <div className="space-y-4">
                             {semana.map((f, i) => {
                                 const fs = f.toISOString().split('T')[0];
@@ -551,18 +635,18 @@
 
                                 return (
                                     <div key={i} className={`bg-white rounded-lg p-4 shadow-md ${esHoy ? 'border-2 border-blue-500' : ''}`}>
-                                        <h3 className="font-bold mb-3">
-                                            {f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                        <h3 className="font-bold mb-3 text-lg">
+                                            {f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                                             {esHoy && <span className="ml-2 text-blue-500 text-sm">(Hoy)</span>}
                                         </h3>
 
                                         <div className="mb-3 bg-yellow-50 rounded-lg p-3">
                                             <div className="flex justify-between items-center mb-2">
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">☀️</span>
+                                                    <span className="mr-2 text-xl">☀️</span>
                                                     <span className="font-semibold">Mañana</span>
                                                 </div>
-                                                <button onClick={() => editar(f, 'mañana')} className="text-blue-500">✏️</button>
+                                                <button onClick={() => editar(f, 'mañana')} className="text-blue-500 text-xl">✏️</button>
                                             </div>
                                             {editando === fs && turno === 'mañana' ? (
                                                 <div className="space-y-2">
@@ -590,10 +674,10 @@
                                         <div className="bg-blue-50 rounded-lg p-3">
                                             <div className="flex justify-between items-center mb-2">
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">🌙</span>
+                                                    <span className="mr-2 text-xl">🌙</span>
                                                     <span className="font-semibold">Tarde</span>
                                                 </div>
-                                                <button onClick={() => editar(f, 'tarde')} className="text-blue-500">✏️</button>
+                                                <button onClick={() => editar(f, 'tarde')} className="text-blue-500 text-xl">✏️</button>
                                             </div>
                                             {editando === fs && turno === 'tarde' ? (
                                                 <div className="space-y-2">
@@ -624,7 +708,8 @@
                     </div>
                 );
             };
-const Territorio = ({ territorio, saveTerritorio }) => {
+
+            const Territorio = ({ territorio, saveTerritorio }) => {
                 const [zoom, setZoom] = useState(1);
                 const [pos, setPos] = useState({ x: 0, y: 0 });
                 const [dragging, setDragging] = useState(false);
@@ -811,7 +896,8 @@ const Territorio = ({ territorio, saveTerritorio }) => {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block font-semibold mb-2">Hora Preferente</label>
+                                            <label className="block font-semib
+<label className="block font-semibold mb-2">Hora Preferente</label>
                                             <input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
                                         </div>
                                     </div>
@@ -899,7 +985,7 @@ const Territorio = ({ territorio, saveTerritorio }) => {
                             {[
                                 { name: 'Inicio', icon: '🏠', key: 'inicio' },
                                 { name: 'Mi Informe', icon: '📊', key: 'informe' },
-                                { name: 'Salidas', icon: '🚗', key: 'salidas' },
+                                { name: 'Agenda Semanal', icon: '📅', key: 'agenda' },
                                 { name: 'Territorio', icon: '🗺️', key: 'territorio' },
                                 { name: 'Interesados', icon: '👥', key: 'interesados' }
                             ].map(item => (
@@ -942,8 +1028,8 @@ const Territorio = ({ territorio, saveTerritorio }) => {
                                 saveMetas={saveMetas}
                             />
                         )}
-                        {tab === 'salidas' && (
-                            <Salidas salidas={salidas} saveSalidas={saveSalidas} />
+                        {tab === 'agenda' && (
+                            <Agenda salidas={salidas} saveSalidas={saveSalidas} />
                         )}
                         {tab === 'territorio' && (
                             <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />
