@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Predicación</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        window.storage = {
+            get: async (key) => {
+                const value = localStorage.getItem(key);
+                return value ? { key, value } : null;
+            },
+            set: async (key, value) => {
+                localStorage.setItem(key, value);
+                return { key, value };
+            }
+        };
+
+        const App = () => {
+            const [tab, setTab] = useState('inicio');
+            const [menu, setMenu] = useState(false);
+            const [informes, setInformes] = useState([]);
+            const [salidas, setSalidas] = useState([]);
+            const [interesados, setInteresados] = useState([]);
+            const [territorio, setTerritorio] = useState(null);
+            const [metaAnual, setMetaAnual] = useState(0);
+            const [metaMensual, setMetaMensual] = useState(0);
+            const [nombre, setNombre] = useState('');
+            const [foto, setFoto] = useState(null);
+            const [editPerfil, setEditPerfil] = useState(false);
+
+            useEffect(() => {
+                (async () => {
+                    const [inf, sal, int, ter, met, per] = await Promise.all([
+                        window.storage.get('informes').catch(() => null),
+                        window.storage.get('salidas').catch(() => null),
+                        window.storage.get('interesados').catch(() => null),
+                        window.storage.get('territorio').catch(() => null),
+                        window.storage.get('metas').catch(() => null),
+                        window.storage.get('perfil').catch(() => null)
+                    ]);
+                    if (inf?.value) setInformes(JSON.parse(inf.value));
+                    if (sal?.value) setSalidas(JSON.parse(sal.value));
+                    if (int?.value) setInteresados(JSON.parse(int.value));
+                    if (ter?.value) setTerritorio(ter.value);
+                    if (met?.value) {
+                        const m = JSON.parse(met.value);
+                        setMetaAnual(m.anual || 0);
+                        setMetaMensual(m.mensual || 0);
+                    }
+                    if (per?.value) {
+                        const p = JSON.parse(per.value);
+                        setNombre(p.nombre || '');
+                        setFoto(p.foto || null);
+                    }
+                })();
+            }, []);
+
+            const saveInformes = async (data) => {
+                setInformes(data);
+                await window.storage.set('informes', JSON.stringify(data));
+            };
+
+            const saveSalidas = async (data) => {
+                setSalidas(data);
+                await window.storage.set('salidas', JSON.stringify(data));
+            };
+
+            const saveInteresados = async (data) => {
+                setInteresados(data);
+                await window.storage.set('interesados', JSON.stringify(data));
+            };
+
+            const saveTerritorio = async (data) => {
+                setTerritorio(data);
+                await window.storage.set('territorio', data);
+            };
+
+            const saveMetas = async (anual, mensual) => {
+                setMetaAnual(anual);
+                setMetaMensual(mensual);
+                await window.storage.set('metas', JSON.stringify({ anual, mensual }));
+            };
+
+            const savePerfil = async (n, f) => {
+                setNombre(n);
+                setFoto(f);
+                await window.storage.set('perfil', JSON.stringify({ nombre: n, foto: f }));
+            };
+
+            const Inicio = ({ nombre, foto, salidas, informes, interesados, metaMensual, setTab, editPerfil, setEditPerfil, savePerfil }) => {
+                const [tempNombre, setTempNombre] = useState(nombre);
+                const hoy = new Date();
+                const hora = hoy.getHours();
+                const esMañana = hora < 14;
+                
+                const salidaHoy = salidas.find(s => {
+                    const f = new Date(s.fecha + 'T00:00:00');
+                    return f.toDateString() === hoy.toDateString() && s.turno === (esMañana ? 'mañana' : 'tarde');
+                });
+
+                const horasMes = informes
+                    .filter(i => i.fecha.startsWith(hoy.toISOString().slice(0, 7)))
+                    .reduce((t, i) => t + i.horas, 0);
+
+                const restantes = metaMensual - horasMes;
+
+                const semana = (() => {
+                    const dia = hoy.getDay();
+                    const dif = (dia + 4) % 7;
+                    const mier = new Date(hoy);
+                    mier.setDate(hoy.getDate() - dif);
+                    return Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date(mier);
+                        d.setDate(mier.getDate() + i);
+                        return d;
+                    });
+                })();
+
+                const visitas = interesados
+                    .filter(i => i.fecha && new Date(i.fecha + 'T00:00:00') >= hoy)
+                    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+                    .slice(0, 3);
+
+                const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+                const handleFoto = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => savePerfil(tempNombre, ev.target.result);
+                        reader.readAsDataURL(file);
+                    }
+                };
+
+                return (
+                    <div className="p-6">
+                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white mb-6 shadow-lg">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="relative">
+                                    {foto ? (
+                                        <img src={foto} alt="Perfil" className="w-16 h-16 rounded-full object-cover border-2 border-white" />
+                                    ) : (
+                                        <div className="w-16 h-16 rounded-full bg-blue-400 flex items-center justify-center text-2xl font-bold">
+                                            {nombre ? nombre[0].toUpperCase() : '👤'}
+                                        </div>
+                                    )}
+                                    <button onClick={() => setEditPerfil(true)} className="absolute -bottom-1 -right-1 bg-white text-blue-600 rounded-full p-1 text-xs">
+                                        📷
+                                    </button>
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold">
+                                        {saludo}{nombre ? `, ${nombre}` : ''}! 👋
+                                    </h2>
+                                    <p className="text-blue-100 capitalize">
+                                        {hoy.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white/20 rounded-lg p-4 mt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm text-blue-100">Este mes</span>
+                                    <span>📈</span>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-3xl font-bold">{horasMes.toFixed(1)}</span>
+                                    <span className="text-lg">/ {metaMensual} hrs</span>
+                                </div>
+                                <div className="mt-2">
+                                    <div className="w-full bg-blue-700 rounded-full h-2">
+                                        <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasMes / metaMensual) * 100, 100)}%` }}></div>
+                                    </div>
+                                    <p className="text-sm text-blue-100 mt-1">
+                                        {restantes > 0 ? `Te faltan ${restantes.toFixed(1)} hrs` : '¡Meta alcanzada! 🎉'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {salidaHoy ? (
+                            <div className="bg-white rounded-lg p-5 shadow-md mb-4">
+                                <h3 className="text-lg font-bold text-gray-800 mb-3">
+                                    🚗 Salida de Hoy ({salidaHoy.turno === 'mañana' ? 'Mañana' : 'Tarde'})
+                                </h3>
+                                <div className="space-y-2 text-gray-700">
+                                    <p className="font-semibold text-xl text-blue-600">{salidaHoy.hora}</p>
+                                    <p>📍 {salidaHoy.lugar}</p>
+                                    <p>👤 Conductor: {salidaHoy.conductor}</p>
+                                    <p>📖 Mapa {salidaHoy.mapa}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-gray-50 rounded-lg p-5 text-center mb-4">
+                                <p className="text-gray-600">⏰ No hay salida programada para hoy</p>
+                            </div>
+                        )}
+
+                        <div className="bg-white rounded-lg p-5 shadow-md mb-4">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3">📅 Esta Semana</h3>
+                            <div className="space-y-2">
+                                {semana.map((f, i) => {
+                                    const fs = f.toISOString().split('T')[0];
+                                    const sm = salidas.find(s => s.fecha === fs && s.turno === 'mañana');
+                                    const st = salidas.find(s => s.fecha === fs && s.turno === 'tarde');
+                                    const esHoy = f.toDateString() === hoy.toDateString();
+
+                                    return (
+                                        <div key={i} className={`flex items-center justify-between p-2 rounded ${esHoy ? 'bg-blue-50' : ''}`}>
+                                            <span className={`font-semibold ${esHoy ? 'text-blue-600' : 'text-gray-700'}`}>
+                                                {f.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }).replace('.', '')}
+                                                {esHoy && ' (Hoy)'}
+                                            </span>
+                                            <div className="flex gap-2">
+                                                <span className={`px-2 py-1 rounded text-xs ${sm ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-400'}`}>
+                                                    ☀️ {sm ? '✓' : '✗'}
+                                                </span>
+                                                <span className={`px-2 py-1 rounded text-xs ${st ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
+                                                    🌙 {st ? '✓' : '✗'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {visitas.length > 0 && (
+                            <div className="bg-white rounded-lg p-5 shadow-md mb-4">
+                                <h3 className="text-lg font-bold text-gray-800 mb-3">👥 Próximas Visitas</h3>
+                                <div className="space-y-3">
+                                    {visitas.map(v => (
+                                        <div key={v.id} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                                            <div>
+                                                <p className="font-semibold text-gray-800">{v.nombre}</p>
+                                                <p className="text-sm text-gray-600">
+                                                    {new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                                    {v.horaPreferente && ` - ${v.horaPreferente}`}
+                                                </p>
+                                            </div>
+                                            <span>📍</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <button onClick={() => setTab('registro-rapido')} className="bg-green-500 text-white p-4 rounded-lg shadow-md hover:bg-green-600">
+                                <div className="text-2xl mb-2">⏱️</div>
+                                <span className="text-sm font-semibold">Registrar Horas</span>
+                            </button>
+                            <button onClick={() => setTab('interesados')} className="bg-purple-500 text-white p-4 rounded-lg shadow-md hover:bg-purple-600">
+                                <div className="text-2xl mb-2">➕</div>
+                                <span className="text-sm font-semibold">Nuevo Interesado</span>
+                            </button>
+                        </div>
+
+                        {editPerfil && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+                                    <h3 className="text-xl font-bold mb-4">Editar Perfil</h3>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2">Nombre</label>
+                                            <input
+                                                type="text"
+                                                value={tempNombre}
+                                                onChange={(e) => setTempNombre(e.target.value)}
+                                                className="w-full p-3 border rounded-lg"
+                                                placeholder="Tu nombre"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold mb-2">Foto de Perfil</label>
+                                            <input type="file" accept="image/*" onChange={handleFoto} className="hidden" id="foto-perfil" />
+                                            <label htmlFor="foto-perfil" className="block w-full p-3 border-2 border-dashed rounded-lg text-center cursor-pointer hover:bg-gray-50">
+                                                {foto ? 'Cambiar Foto' : 'Seleccionar Foto'}
+                                            </label>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => { savePerfil(tempNombre, foto); setEditPerfil(false); }}
+                                                className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
+                                            >
+                                                Guardar
+                                            </button>
+                                            <button onClick={() => setEditPerfil(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400">
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+ const RegistroRapido = ({ informes, saveInformes, setTab }) => {
+                const hoy = new Date().toISOString().split('T')[0];
+                const inf = informes.find(i => i.fecha === hoy);
+                const [horas, setHoras] = useState(inf?.horas || 0);
+                const [cursos, setCursos] = useState(inf?.cursos || '');
+
+                const guardar = () => {
+                    const nuevo = informes.filter(i => i.fecha !== hoy);
+                    if (horas > 0 || cursos) {
+                        nuevo.push({ fecha: hoy, horas: parseFloat(horas), cursos: parseInt(cursos) || 0 });
+                    }
+                    saveInformes(nuevo);
+                    alert('¡Horas registradas!');
+                    setTab('inicio');
+                };
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">Registrar Horas de Hoy</h2>
+                        <div className="bg-white rounded-lg p-6 shadow-md">
+                            <p className="text-center text-gray-600 mb-6">
+                                {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </p>
+                            <div className="mb-6">
+                                <label className="block font-semibold mb-3 text-center">Horas</label>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-16 h-16 rounded-full text-3xl hover:bg-red-600">
+                                        −
+                                    </button>
+                                    <div className="flex-1 text-center">
+                                        <span className="text-6xl font-bold">{horas.toFixed(1)}</span>
+                                        <p className="text-gray-500 text-lg mt-2">horas</p>
+                                    </div>
+                                    <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-16 h-16 rounded-full text-3xl hover:bg-green-600">
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mb-6">
+                                <label className="block font-semibold mb-2">Cursos Bíblicos (opcional)</label>
+                                <input
+                                    type="number"
+                                    value={cursos}
+                                    onChange={(e) => setCursos(e.target.value)}
+                                    className="w-full p-3 border rounded-lg text-center text-2xl"
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={guardar} className="flex-1 bg-blue-500 text-white py-4 rounded-lg hover:bg-blue-600 text-lg font-semibold">
+                                    💾 Guardar
+                                </button>
+                                <button onClick={() => setTab('inicio')} className="flex-1 bg-gray-300 text-gray-700 py-4 rounded-lg hover:bg-gray-400 text-lg font-semibold">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) => {
+                const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
+                const [dia, setDia] = useState(new Date().getDate());
+                const [horas, setHoras] = useState(0);
+                const [cursos, setCursos] = useState('');
+                const [editMetas, setEditMetas] = useState(false);
+                const [tempAnual, setTempAnual] = useState(metaAnual);
+                const [tempMensual, setTempMensual] = useState(metaMensual);
+
+                const fecha = `${mes}-${String(dia).padStart(2, '0')}`;
+                const inf = informes.find(i => i.fecha === fecha);
+
+                useEffect(() => {
+                    if (inf) {
+                        setHoras(inf.horas);
+                        setCursos(inf.cursos);
+                    } else {
+                        setHoras(0);
+                        setCursos('');
+                    }
+                }, [dia, mes]);
+
+                const guardar = () => {
+                    const nuevo = informes.filter(i => i.fecha !== fecha);
+                    if (horas > 0 || cursos) {
+                        nuevo.push({ fecha, horas: parseFloat(horas), cursos: parseInt(cursos) || 0 });
+                    }
+                    saveInformes(nuevo);
+                    alert('Informe guardado');
+                };
+
+                const horasAnio = (() => {
+                    const hoy = new Date();
+                    const m = hoy.getMonth();
+                    const a = hoy.getFullYear();
+                    const inicio = m >= 8 ? new Date(a, 8, 1) : new Date(a - 1, 8, 1);
+                    const fin = m >= 8 ? new Date(a + 1, 7, 31) : new Date(a, 7, 31);
+                    return informes
+                        .filter(i => {
+                            const f = new Date(i.fecha + 'T00:00:00');
+                            return f >= inicio && f <= fin;
+                        })
+                        .reduce((t, i) => t + i.horas, 0);
+                })();
+
+                const horasMes = informes.filter(i => i.fecha.startsWith(mes)).reduce((t, i) => t + i.horas, 0);
+                const diasMes = new Date(mes.split('-')[0], mes.split('-')[1], 0).getDate();
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">Mi Informe de Actividad</h2>
+                        <div className="bg-white rounded-lg p-6 shadow-md mb-6">
+                            <label className="block font-semibold mb-2">Mes</label>
+                            <input type="month" value={mes} onChange={(e) => { setMes(e.target.value); setDia(1); }} className="w-full p-3 border rounded-lg mb-4" />
+                            <label className="block font-semibold mb-2">Día</label>
+                            <select value={dia} onChange={(e) => setDia(parseInt(e.target.value))} className="w-full p-3 border rounded-lg mb-4">
+                                {Array.from({ length: diasMes }, (_, i) => (
+                                    <option key={i + 1} value={i + 1}>
+                                        {i + 1} - {new Date(mes + `-${String(i + 1).padStart(2, '0')}`).toLocaleDateString('es-ES', { weekday: 'long' })}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="mt-4">
+                                <label className="block font-semibold mb-2">Horas</label>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-12 h-12 rounded-lg hover:bg-red-600 text-2xl">
+                                        −
+                                    </button>
+                                    <div className="flex-1 text-center">
+                                        <span className="text-4xl font-bold">{horas.toFixed(1)}</span>
+                                        <p className="text-gray-500 text-sm">horas</p>
+                                    </div>
+                                    <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-12 h-12 rounded-lg hover:bg-green-600 text-2xl">
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <label className="block font-semibold mb-2">Cursos Bíblicos</label>
+                                <input type="number" value={cursos} onChange={(e) => setCursos(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="0" />
+                            </div>
+                            <button onClick={guardar} className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
+                                💾 Guardar Informe
+                            </button>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white shadow-md">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold">Metas</h3>
+                                <button
+                                    onClick={() => {
+                                        if (editMetas) saveMetas(tempAnual, tempMensual);
+                                        setEditMetas(!editMetas);
+                                    }}
+                                    className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold"
+                                >
+                                    {editMetas ? 'Guardar' : 'Editar'}
+                                </button>
+                            </div>
+                            {editMetas ? (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-green-100 mb-1">Meta Anual (Sep-Sep)</label>
+                                        <input type="number" value={tempAnual} onChange={(e) => setTempAnual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-green-100 mb-1">Meta Mensual</label>
+                                        <input type="number" value={tempMensual} onChange={(e) => setTempMensual(parseFloat(e.target.value) || 0)} className="w-full p-2 rounded text-gray-800" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-green-100 mb-1">Año de Servicio (Sep-Sep)</p>
+                                        <p className="text-3xl font-bold">{horasAnio.toFixed(1)} / {metaAnual} hrs</p>
+                                        <p className="text-green-100 mt-1">Restantes: {(metaAnual - horasAnio).toFixed(1)} hrs</p>
+                                        <div className="w-full bg-green-700 rounded-full h-2 mt-2">
+                                            <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasAnio / metaAnual) * 100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-green-100 mb-1">Este Mes</p>
+                                        <p className="text-3xl font-bold">{horasMes.toFixed(1)} / {metaMensual} hrs</p>
+                                        <p className="text-green-100 mt-1">Restantes: {(metaMensual - horasMes).toFixed(1)} hrs</p>
+                                        <div className="w-full bg-green-700 rounded-full h-2 mt-2">
+                                            <div className="bg-white h-2 rounded-full" style={{ width: `${Math.min((horasMes / metaMensual) * 100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            const Salidas = ({ salidas, saveSalidas }) => {
+                const [editando, setEditando] = useState(null);
+                const [turno, setTurno] = useState(null);
+                const [form, setForm] = useState({ fecha: '', turno: 'mañana', hora: '', lugar: '', conductor: '', mapa: '' });
+
+                const semana = (() => {
+                    const hoy = new Date();
+                    const dia = hoy.getDay();
+                    const dif = (dia + 4) % 7;
+                    const mier = new Date(hoy);
+                    mier.setDate(hoy.getDate() - dif);
+                    return Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date(mier);
+                        d.setDate(mier.getDate() + i);
+                        return d;
+                    });
+                })();
+
+                const guardar = () => {
+                    if (!form.fecha) return;
+                    const nuevo = salidas.filter(s => !(s.fecha === form.fecha && s.turno === form.turno));
+                    if (form.hora || form.lugar || form.conductor || form.mapa) {
+                        nuevo.push({ ...form });
+                    }
+                    saveSalidas(nuevo);
+                    setEditando(null);
+                    setTurno(null);
+                };
+
+                const editar = (fecha, t) => {
+                    const fs = fecha.toISOString().split('T')[0];
+                    const sal = salidas.find(s => s.fecha === fs && s.turno === t);
+                    setForm(sal || { fecha: fs, turno: t, hora: '', lugar: '', conductor: '', mapa: '' });
+                    setEditando(fs);
+                    setTurno(t);
+                };
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">Salidas de la Semana</h2>
+                        <div className="space-y-4">
+                            {semana.map((f, i) => {
+                                const fs = f.toISOString().split('T')[0];
+                                const sm = salidas.find(s => s.fecha === fs && s.turno === 'mañana');
+                                const st = salidas.find(s => s.fecha === fs && s.turno === 'tarde');
+                                const esHoy = f.toDateString() === new Date().toDateString();
+
+                                return (
+                                    <div key={i} className={`bg-white rounded-lg p-4 shadow-md ${esHoy ? 'border-2 border-blue-500' : ''}`}>
+                                        <h3 className="font-bold mb-3">
+                                            {f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                            {esHoy && <span className="ml-2 text-blue-500 text-sm">(Hoy)</span>}
+                                        </h3>
+
+                                        <div className="mb-3 bg-yellow-50 rounded-lg p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center">
+                                                    <span className="mr-2">☀️</span>
+                                                    <span className="font-semibold">Mañana</span>
+                                                </div>
+                                                <button onClick={() => editar(f, 'mañana')} className="text-blue-500">✏️</button>
+                                            </div>
+                                            {editando === fs && turno === 'mañana' ? (
+                                                <div className="space-y-2">
+                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
+                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
+                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
+                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
+                                                    <div className="flex gap-2">
+                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
+                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            ) : sm ? (
+                                                <div className="text-sm space-y-1">
+                                                    <p>⏰ {sm.hora}</p>
+                                                    <p>📍 {sm.lugar}</p>
+                                                    <p>👤 {sm.conductor}</p>
+                                                    <p>📖 Mapa {sm.mapa}</p>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400 text-sm">Sin programar</p>
+                                            )}
+                                        </div>
+
+                                        <div className="bg-blue-50 rounded-lg p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center">
+                                                    <span className="mr-2">🌙</span>
+                                                    <span className="font-semibold">Tarde</span>
+                                                </div>
+                                                <button onClick={() => editar(f, 'tarde')} className="text-blue-500">✏️</button>
+                                            </div>
+                                            {editando === fs && turno === 'tarde' ? (
+                                                <div className="space-y-2">
+                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
+                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
+                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
+                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
+                                                    <div className="flex gap-2">
+                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
+                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            ) : st ? (
+                                                <div className="text-sm space-y-1">
+                                                    <p>⏰ {st.hora}</p>
+                                                    <p>📍 {st.lugar}</p>
+                                                    <p>👤 {st.conductor}</p>
+                                                    <p>📖 Mapa {st.mapa}</p>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400 text-sm">Sin programar</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+const Territorio = ({ territorio, saveTerritorio }) => {
+                const [zoom, setZoom] = useState(1);
+                const [pos, setPos] = useState({ x: 0, y: 0 });
+                const [dragging, setDragging] = useState(false);
+                const [start, setStart] = useState({ x: 0, y: 0 });
+
+                const handleFile = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            saveTerritorio(ev.target.result);
+                            setZoom(1);
+                            setPos({ x: 0, y: 0 });
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">Territorio de la Congregación</h2>
+                        {!territorio ? (
+                            <div className="bg-white rounded-lg p-8 shadow-md text-center">
+                                <div className="text-6xl mb-4">🗺️</div>
+                                <p className="text-gray-600 mb-4">No hay imagen del territorio cargada</p>
+                                <input type="file" accept="image/*" onChange={handleFile} className="hidden" id="territorio-upload" />
+                                <label htmlFor="territorio-upload" className="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-600">
+                                    Cargar Imagen
+                                </label>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="flex gap-2 mb-4">
+                                    <button onClick={() => setZoom(Math.max(0.5, zoom - 0.5))} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Zoom -</button>
+                                    <button onClick={() => { setZoom(1); setPos({ x: 0, y: 0 }); }} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Reset</button>
+                                    <button onClick={() => setZoom(Math.min(5, zoom + 0.5))} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Zoom +</button>
+                                </div>
+                                <div
+                                    className="bg-gray-100 rounded-lg overflow-hidden"
+                                    style={{ height: '400px', position: 'relative', touchAction: 'none' }}
+                                    onMouseMove={(e) => dragging && setPos({ x: e.clientX - start.x, y: e.clientY - start.y })}
+                                    onMouseUp={() => setDragging(false)}
+                                    onMouseLeave={() => setDragging(false)}
+                                    onTouchMove={(e) => {
+                                        if (dragging && e.touches.length > 0) {
+                                            const t = e.touches[0];
+                                            setPos({ x: t.clientX - start.x, y: t.clientY - start.y });
+                                        }
+                                    }}
+                                    onTouchEnd={() => setDragging(false)}
+                                >
+                                    <img
+                                        src={territorio}
+                                        alt="Territorio"
+                                        style={{
+                                            transform: `scale(${zoom}) translate(${pos.x / zoom}px, ${pos.y / zoom}px)`,
+                                            transformOrigin: '0 0',
+                                            cursor: dragging ? 'grabbing' : 'grab',
+                                            maxWidth: 'none',
+                                            userSelect: 'none'
+                                        }}
+                                        onMouseDown={(e) => {
+                                            setDragging(true);
+                                            setStart({ x: e.clientX - pos.x, y: e.clientY - pos.y });
+                                        }}
+                                        onTouchStart={(e) => {
+                                            const t = e.touches[0];
+                                            setDragging(true);
+                                            setStart({ x: t.clientX - pos.x, y: t.clientY - pos.y });
+                                        }}
+                                        draggable={false}
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => confirm('¿Cambiar imagen?') && document.getElementById('territorio-change').click()}
+                                    className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
+                                >
+                                    Cambiar Imagen
+                                </button>
+                                <input type="file" accept="image/*" onChange={handleFile} className="hidden" id="territorio-change" />
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            const Interesados = ({ interesados, saveInteresados }) => {
+                const [mostrar, setMostrar] = useState(false);
+                const [editId, setEditId] = useState(null);
+                const [form, setForm] = useState({
+                    nombre: '', direccion: '', fecha: '', horaPreferente: '', diaPreferente: '',
+                    numeroMapa: '', anotaciones: '', lat: '', lng: ''
+                });
+
+                const abrir = (int = null) => {
+                    if (int) {
+                        setForm(int);
+                        setEditId(int.id);
+                    } else {
+                        setForm({
+                            nombre: '', direccion: '', fecha: new Date().toISOString().split('T')[0],
+                            horaPreferente: '', diaPreferente: '', numeroMapa: '', anotaciones: '', lat: '', lng: ''
+                        });
+                        setEditId(null);
+                    }
+                    setMostrar(true);
+                };
+
+                const guardar = () => {
+                    if (!form.nombre) return alert('El nombre es requerido');
+                    let nuevo;
+                    if (editId) {
+                        nuevo = interesados.map(i => i.id === editId ? { ...form, id: editId } : i);
+                    } else {
+                        nuevo = [...interesados, { ...form, id: Date.now().toString() }];
+                    }
+                    saveInteresados(nuevo);
+                    setMostrar(false);
+                    alert('Interesado guardado');
+                };
+
+                const eliminar = (id) => {
+                    if (confirm('¿Eliminar?')) saveInteresados(interesados.filter(i => i.id !== id));
+                };
+
+                const abrirMapa = (lat, lng) => {
+                    if (lat && lng) window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+                    else alert('No hay ubicación');
+                };
+
+                const getUbicacion = () => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                setForm({ ...form, lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) });
+                                alert('Ubicación obtenida');
+                            },
+                            () => alert('No se pudo obtener ubicación')
+                        );
+                    } else {
+                        alert('Tu navegador no soporta geolocalización');
+                    }
+                };
+
+                return (
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold">Interesados</h2>
+                            {!mostrar && (
+                                <button onClick={() => abrir()} className="bg-purple-500 text-white p-3 rounded-full shadow-lg hover:bg-purple-600 text-2xl">
+                                    ➕
+                                </button>
+                            )}
+                        </div>
+
+                        {mostrar ? (
+                            <div className="bg-white rounded-lg p-6 shadow-md">
+                                <h3 className="text-xl font-bold mb-4">{editId ? 'Editar' : 'Nuevo'} Interesado</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block font-semibold mb-2">Nombre *</label>
+                                        <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Nombre" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Dirección</label>
+                                        <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Dirección" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Fecha de Visita</label>
+                                        <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="w-full p-3 border rounded-lg" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2">Día Preferente</label>
+                                            <select value={form.diaPreferente} onChange={(e) => setForm({ ...form, diaPreferente: e.target.value })} className="w-full p-3 border rounded-lg">
+                                                <option value="">Seleccionar</option>
+                                                <option value="Lunes">Lunes</option>
+                                                <option value="Martes">Martes</option>
+                                                <option value="Miércoles">Miércoles</option>
+                                                <option value="Jueves">Jueves</option>
+                                                <option value="Viernes">Viernes</option>
+                                                <option value="Sábado">Sábado</option>
+                                                <option value="Domingo">Domingo</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold mb-2">Hora Preferente</label>
+                                            <input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Número de Mapa</label>
+                                        <input type="text" value={form.numeroMapa} onChange={(e) => setForm({ ...form, numeroMapa: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Ej: A-12" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Ubicación (GPS)</label>
+                                        <div className="flex gap-2 mb-2">
+                                            <input type="text" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Latitud" />
+                                            <input type="text" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Longitud" />
+                                        </div>
+                                        <button onClick={getUbicacion} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
+                                            📍 Usar Mi Ubicación Actual
+                                        </button>
+                                        <p className="text-xs text-gray-500 mt-2">💡 O copia las coordenadas desde Google Maps</p>
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Anotaciones</label>
+                                        <textarea value={form.anotaciones} onChange={(e) => setForm({ ...form, anotaciones: e.target.value })} className="w-full p-3 border rounded-lg" rows="4" placeholder="Notas..."></textarea>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={guardar} className="flex-1 bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 font-semibold">
+                                            💾 Guardar
+                                        </button>
+                                        <button onClick={() => setMostrar(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {interesados.length === 0 ? (
+                                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                                        <div className="text-6xl mb-4">👥</div>
+                                        <p className="text-gray-600">No hay interesados registrados</p>
+                                        <p className="text-gray-500 text-sm mt-2">Presiona el botón + para agregar</p>
+                                    </div>
+                                ) : (
+                                    interesados.map(int => (
+                                        <div key={int.id} className="bg-white rounded-lg p-5 shadow-md">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <h3 className="text-lg font-bold">{int.nombre}</h3>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => abrir(int)} className="text-blue-500">✏️</button>
+                                                    <button onClick={() => eliminar(int.id)} className="text-red-500">🗑️</button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2 text-sm text-gray-700">
+                                                {int.direccion && <p>📍 {int.direccion}</p>}
+                                                {int.fecha && <p>📅 {new Date(int.fecha + 'T00:00:00').toLocaleDateString('es-ES')}</p>}
+                                                {int.diaPreferente && <p>📆 {int.diaPreferente}{int.horaPreferente && ` - ${int.horaPreferente}`}</p>}
+                                                {int.numeroMapa && <p>📖 Mapa: {int.numeroMapa}</p>}
+                                                {int.anotaciones && <p className="mt-2 p-3 bg-gray-50 rounded">{int.anotaciones}</p>}
+                                                {int.lat && int.lng && (
+                                                    <button onClick={() => abrirMapa(int.lat, int.lng)} className="w-full mt-2 bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
+                                                        🗺️ Ver en Google Maps
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 shadow-lg">
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-xl font-bold">Mi Predicación</h1>
+                            <button onClick={() => setMenu(!menu)} className="p-2 hover:bg-blue-500 rounded">
+                                {menu ? '✕' : '☰'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {menu && (
+                        <div className="bg-white shadow-lg">
+                            {[
+                                { name: 'Inicio', icon: '🏠', key: 'inicio' },
+                                { name: 'Mi Informe', icon: '📊', key: 'informe' },
+                                { name: 'Salidas', icon: '🚗', key: 'salidas' },
+                                { name: 'Territorio', icon: '🗺️', key: 'territorio' },
+                                { name: 'Interesados', icon: '👥', key: 'interesados' }
+                            ].map(item => (
+                                <button
+                                    key={item.key}
+                                    onClick={() => { setTab(item.key); setMenu(false); }}
+                                    className="w-full text-left p-4 hover:bg-gray-100 border-b flex items-center gap-3"
+                                >
+                                    <span className="text-xl">{item.icon}</span>
+                                    <span className="font-semibold">{item.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="pb-6">
+                        {tab === 'inicio' && (
+                            <Inicio
+                                nombre={nombre}
+                                foto={foto}
+                                salidas={salidas}
+                                informes={informes}
+                                interesados={interesados}
+                                metaMensual={metaMensual}
+                                setTab={setTab}
+                                editPerfil={editPerfil}
+                                setEditPerfil={setEditPerfil}
+                                savePerfil={savePerfil}
+                            />
+                        )}
+                        {tab === 'registro-rapido' && (
+                            <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />
+                        )}
+                        {tab === 'informe' && (
+                            <Informe
+                                informes={informes}
+                                saveInformes={saveInformes}
+                                metaAnual={metaAnual}
+                                metaMensual={metaMensual}
+                                saveMetas={saveMetas}
+                            />
+                        )}
+                        {tab === 'salidas' && (
+                            <Salidas salidas={salidas} saveSalidas={saveSalidas} />
+                        )}
+                        {tab === 'territorio' && (
+                            <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />
+                        )}
+                        {tab === 'interesados' && (
+                            <Interesados interesados={interesados} saveInteresados={saveInteresados} />
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
