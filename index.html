@@ -37,16 +37,18 @@
             const [nombre, setNombre] = useState('');
             const [foto, setFoto] = useState(null);
             const [editPerfil, setEditPerfil] = useState(false);
+            const [agenda, setAgenda] = useState([]);
 
             useEffect(() => {
                 (async () => {
-                    const [inf, sal, int, ter, met, per] = await Promise.all([
+                    const [inf, sal, int, ter, met, per, age] = await Promise.all([
                         window.storage.get('informes').catch(() => null),
                         window.storage.get('salidas').catch(() => null),
                         window.storage.get('interesados').catch(() => null),
                         window.storage.get('territorio').catch(() => null),
                         window.storage.get('metas').catch(() => null),
-                        window.storage.get('perfil').catch(() => null)
+                        window.storage.get('perfil').catch(() => null),
+                        window.storage.get('agenda').catch(() => null)
                     ]);
                     if (inf?.value) setInformes(JSON.parse(inf.value));
                     if (sal?.value) setSalidas(JSON.parse(sal.value));
@@ -62,6 +64,7 @@
                         setNombre(p.nombre || '');
                         setFoto(p.foto || null);
                     }
+                    if (age?.value) setAgenda(JSON.parse(age.value));
                 })();
             }, []);
 
@@ -97,8 +100,20 @@
                 await window.storage.set('perfil', JSON.stringify({ nombre: n, foto: f }));
             };
 
+            const saveAgenda = async (data) => {
+                setAgenda(data);
+                await window.storage.set('agenda', JSON.stringify(data));
+            };
+
             const Inicio = ({ nombre, foto, salidas, informes, interesados, metaMensual, setTab, editPerfil, setEditPerfil, savePerfil }) => {
                 const [tempNombre, setTempNombre] = useState(nombre);
+                const [tempFoto, setTempFoto] = useState(foto);
+                
+                useEffect(() => {
+                    setTempNombre(nombre);
+                    setTempFoto(foto);
+                }, [nombre, foto, editPerfil]);
+
                 const hoy = new Date();
                 const hora = hoy.getHours();
                 const esMañana = hora < 14;
@@ -143,17 +158,16 @@
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = (ev) => {
-                            const nuevaFoto = ev.target.result;
-                            setFoto(nuevaFoto);
-                            savePerfil(tempNombre, nuevaFoto);
+                            setTempFoto(ev.target.result);
                         };
                         reader.readAsDataURL(file);
                     }
                 };
 
-                useEffect(() => {
-                    setTempNombre(nombre);
-                }, [nombre]);
+                const guardarPerfil = () => {
+                    savePerfil(tempNombre, tempFoto);
+                    setEditPerfil(false);
+                };
 
                 return (
                     <div className="p-6">
@@ -303,14 +317,19 @@
                                         </div>
                                         <div>
                                             <label className="block font-semibold mb-2">Foto de Perfil</label>
+                                            {tempFoto && (
+                                                <div className="mb-2 text-center">
+                                                    <img src={tempFoto} alt="Vista previa" className="w-20 h-20 rounded-full mx-auto object-cover" />
+                                                </div>
+                                            )}
                                             <input type="file" accept="image/*" onChange={handleFoto} className="hidden" id="foto-perfil" />
                                             <label htmlFor="foto-perfil" className="block w-full p-3 border-2 border-dashed rounded-lg text-center cursor-pointer hover:bg-gray-50">
-                                                {foto ? 'Cambiar Foto' : 'Seleccionar Foto'}
+                                                {tempFoto ? 'Cambiar Foto' : 'Seleccionar Foto'}
                                             </label>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => { savePerfil(tempNombre, foto); setEditPerfil(false); }}
+                                                onClick={guardarPerfil}
                                                 className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
                                             >
                                                 Guardar
@@ -425,12 +444,10 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                     const a = hoy.getFullYear();
                     const inicio = m >= 8 ? new Date(a, 8, 1) : new Date(a - 1, 8, 1);
                     const fin = m >= 8 ? new Date(a + 1, 7, 31) : new Date(a, 7, 31);
-                    return informes
-                        .filter(i => {
-                            const f = new Date(i.fecha + 'T00:00:00');
-                            return f >= inicio && f <= fin;
-                        })
-                        .reduce((t, i) => t + i.horas, 0);
+                    return informes.filter(i => {
+                        const f = new Date(i.fecha + 'T00:00:00');
+                        return f >= inicio && f <= fin;
+                    }).reduce((t, i) => t + i.horas, 0);
                 })();
 
                 const horasMes = informes.filter(i => i.fecha.startsWith(mes)).reduce((t, i) => t + i.horas, 0);
@@ -446,7 +463,7 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                     });
                     return Object.keys(meses).sort().reverse().map(m => ({
                         mes: m,
-                        nombre: new Date(m + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+                        nombre: new Date(m + '-15').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
                         ...meses[m]
                     }));
                 })();
@@ -454,22 +471,15 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                 return (
                     <div className="p-6">
                         <h2 className="text-2xl font-bold mb-6">Mi Informe de Actividad</h2>
-
                         <div className="mb-4">
-                            <button
-                                onClick={() => setVerHistorial(!verHistorial)}
-                                className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold"
-                            >
+                            <button onClick={() => setVerHistorial(!verHistorial)} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
                                 {verHistorial ? '📝 Volver a Registrar' : '📊 Ver Historial de Meses'}
                             </button>
                         </div>
-
                         {verHistorial ? (
                             <div className="space-y-3">
                                 {mesesConActividad.length === 0 ? (
-                                    <div className="bg-gray-50 rounded-lg p-8 text-center">
-                                        <p className="text-gray-600">No hay informes registrados</p>
-                                    </div>
+                                    <div className="bg-gray-50 rounded-lg p-8 text-center"><p className="text-gray-600">No hay informes registrados</p></div>
                                 ) : (
                                     mesesConActividad.map((m, i) => (
                                         <div key={i} className="bg-white rounded-lg p-5 shadow-md">
@@ -484,14 +494,7 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                                                     <p className="text-sm text-gray-600">Cursos</p>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => {
-                                                    setMes(m.mes);
-                                                    setDia(1);
-                                                    setVerHistorial(false);
-                                                }}
-                                                className="w-full mt-3 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
-                                            >
+                                            <button onClick={() => { setMes(m.mes); setDia(1); setVerHistorial(false); }} className="w-full mt-3 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                                                 Ver detalles
                                             </button>
                                         </div>
@@ -514,37 +517,24 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                                     <div className="mt-4">
                                         <label className="block font-semibold mb-2">Horas</label>
                                         <div className="flex items-center gap-3">
-                                            <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-12 h-12 rounded-lg hover:bg-red-600 text-2xl">
-                                                −
-                                            </button>
+                                            <button onClick={() => setHoras(Math.max(0, horas - 0.5))} className="bg-red-500 text-white w-12 h-12 rounded-lg hover:bg-red-600 text-2xl">−</button>
                                             <div className="flex-1 text-center">
                                                 <span className="text-4xl font-bold">{horas.toFixed(1)}</span>
                                                 <p className="text-gray-500 text-sm">horas</p>
                                             </div>
-                                            <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-12 h-12 rounded-lg hover:bg-green-600 text-2xl">
-                                                +
-                                            </button>
+                                            <button onClick={() => setHoras(horas + 0.5)} className="bg-green-500 text-white w-12 h-12 rounded-lg hover:bg-green-600 text-2xl">+</button>
                                         </div>
                                     </div>
                                     <div className="mt-4">
                                         <label className="block font-semibold mb-2">Cursos Bíblicos</label>
                                         <input type="number" value={cursos} onChange={(e) => setCursos(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="0" />
                                     </div>
-                                    <button onClick={guardar} className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
-                                        💾 Guardar Informe
-                                    </button>
+                                    <button onClick={guardar} className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">💾 Guardar Informe</button>
                                 </div>
-
                                 <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white shadow-md">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="text-xl font-bold">Metas</h3>
-                                        <button
-                                            onClick={() => {
-                                                if (editMetas) saveMetas(tempAnual, tempMensual);
-                                                setEditMetas(!editMetas);
-                                            }}
-                                            className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold"
-                                        >
+                                        <button onClick={() => { if (editMetas) saveMetas(tempAnual, tempMensual); setEditMetas(!editMetas); }} className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold">
                                             {editMetas ? 'Guardar' : 'Editar'}
                                         </button>
                                     </div>
@@ -586,10 +576,97 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                 );
             };
 
-            const Agenda = ({ salidas, saveSalidas }) => {
+            const AgendaSemanal = ({ salidas, saveSalidas }) => {
                 const [editando, setEditando] = useState(null);
                 const [turno, setTurno] = useState(null);
                 const [form, setForm] = useState({ fecha: '', turno: 'mañana', hora: '', lugar: '', conductor: '', mapa: '' });
+                const semana = (() => {
+                    const hoy = new Date();
+                    const dia = hoy.getDay();
+                    const dif = (dia + 4) % 7;
+                    const mier = new Date(hoy);
+                    mier.setDate(hoy.getDate() - dif);
+                    return Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date(mier);
+                        d.setDate(mier.getDate() + i);
+                        return d;
+                    });
+                })();
+                const guardar = () => {
+                    if (!form.fecha) return;
+                    const nuevo = salidas.filter(s => !(s.fecha === form.fecha && s.turno === form.turno));
+                    if (form.hora || form.lugar || form.conductor || form.mapa) nuevo.push({ ...form });
+                    saveSalidas(nuevo);
+                    setEditando(null);
+                    setTurno(null);
+                };
+                const editar = (fecha, t) => {
+                    const fs = fecha.toISOString().split('T')[0];
+                    const sal = salidas.find(s => s.fecha === fs && s.turno === t);
+                    setForm(sal || { fecha: fs, turno: t, hora: '', lugar: '', conductor: '', mapa: '' });
+                    setEditando(fs);
+                    setTurno(t);
+                };
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">🚗 Salidas Semanales</h2>
+                        <div className="space-y-4">
+                            {semana.map((f, i) => {
+                                const fs = f.toISOString().split('T')[0];
+                                const sm = salidas.find(s => s.fecha === fs && s.turno === 'mañana');
+                                const st = salidas.find(s => s.fecha === fs && s.turno === 'tarde');
+                                const esHoy = f.toDateString() === new Date().toDateString();
+                                return (
+                                    <div key={i} className={`bg-white rounded-lg p-4 shadow-md ${esHoy ? 'border-2 border-blue-500' : ''}`}>
+                                        <h3 className="font-bold mb-3 text-lg">{f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}{esHoy && <span className="ml-2 text-blue-500 text-sm">(Hoy)</span>}</h3>
+                                        <div className="mb-3 bg-yellow-50 rounded-lg p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center"><span className="mr-2 text-xl">☀️</span><span className="font-semibold">Mañana</span></div>
+                                                <button onClick={() => editar(f, 'mañana')} className="text-blue-500 text-xl">✏️</button>
+                                            </div>
+                                            {editando === fs && turno === 'mañana' ? (
+                                                <div className="space-y-2">
+                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
+                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
+                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
+                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
+                                                    <div className="flex gap-2">
+                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
+                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            ) : sm ? (<div className="text-sm space-y-1"><p>⏰ {sm.hora}</p><p>📍 {sm.lugar}</p><p>👤 {sm.conductor}</p><p>📖 Mapa {sm.mapa}</p></div>) : (<p className="text-gray-400 text-sm">Sin programar</p>)}
+                                        </div>
+                                        <div className="bg-blue-50 rounded-lg p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center"><span className="mr-2 text-xl">🌙</span><span className="font-semibold">Tarde</span></div>
+                                                <button onClick={() => editar(f, 'tarde')} className="text-blue-500 text-xl">✏️</button>
+                                            </div>
+                                            {editando === fs && turno === 'tarde' ? (
+                                                <div className="space-y-2">
+                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
+                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
+                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
+                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
+                                                    <div className="flex gap-2">
+                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
+                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            ) : st ? (<div className="text-sm space-y-1"><p>⏰ {st.hora}</p><p>📍 {st.lugar}</p><p>👤 {st.conductor}</p><p>📖 Mapa {st.mapa}</p></div>) : (<p className="text-gray-400 text-sm">Sin programar</p>)}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            const AgendaActividades = ({ agenda, saveAgenda }) => {
+                const [mostrar, setMostrar] = useState(false);
+                const [editId, setEditId] = useState(null);
+                const [form, setForm] = useState({ fecha: '', hora: '', actividad: '', notas: '' });
 
                 const semana = (() => {
                     const hoy = new Date();
@@ -604,444 +681,291 @@ const Informe = ({ informes, saveInformes, metaAnual, metaMensual, saveMetas }) 
                     });
                 })();
 
-                const guardar = () => {
-                    if (!form.fecha) return;
-                    const nuevo = salidas.filter(s => !(s.fecha === form.fecha && s.turno === form.turno));
-                    if (form.hora || form.lugar || form.conductor || form.mapa) {
-                        nuevo.push({ ...form });
-                    }
-                    saveSalidas(nuevo);
-                    setEditando(null);
-                    setTurno(null);
-                };
-
-                const editar = (fecha, t) => {
-                    const fs = fecha.toISOString().split('T')[0];
-                    const sal = salidas.find(s => s.fecha === fs && s.turno === t);
-                    setForm(sal || { fecha: fs, turno: t, hora: '', lugar: '', conductor: '', mapa: '' });
-                    setEditando(fs);
-                    setTurno(t);
-                };
-
-                return (
-                    <div className="p-6">
-                        <h2 className="text-2xl font-bold mb-6">📅 Agenda Semanal</h2>
-                        <div className="space-y-4">
-                            {semana.map((f, i) => {
-                                const fs = f.toISOString().split('T')[0];
-                                const sm = salidas.find(s => s.fecha === fs && s.turno === 'mañana');
-                                const st = salidas.find(s => s.fecha === fs && s.turno === 'tarde');
-                                const esHoy = f.toDateString() === new Date().toDateString();
-
-                                return (
-                                    <div key={i} className={`bg-white rounded-lg p-4 shadow-md ${esHoy ? 'border-2 border-blue-500' : ''}`}>
-                                        <h3 className="font-bold mb-3 text-lg">
-                                            {f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                            {esHoy && <span className="ml-2 text-blue-500 text-sm">(Hoy)</span>}
-                                        </h3>
-
-                                        <div className="mb-3 bg-yellow-50 rounded-lg p-3">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center">
-                                                    <span className="mr-2 text-xl">☀️</span>
-                                                    <span className="font-semibold">Mañana</span>
-                                                </div>
-                                                <button onClick={() => editar(f, 'mañana')} className="text-blue-500 text-xl">✏️</button>
-                                            </div>
-                                            {editando === fs && turno === 'mañana' ? (
-                                                <div className="space-y-2">
-                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
-                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
-                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
-                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
-                                                    <div className="flex gap-2">
-                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
-                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
-                                                    </div>
-                                                </div>
-                                            ) : sm ? (
-                                                <div className="text-sm space-y-1">
-                                                    <p>⏰ {sm.hora}</p>
-                                                    <p>📍 {sm.lugar}</p>
-                                                    <p>👤 {sm.conductor}</p>
-                                                    <p>📖 Mapa {sm.mapa}</p>
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-400 text-sm">Sin programar</p>
-                                            )}
-                                        </div>
-
-                                        <div className="bg-blue-50 rounded-lg p-3">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center">
-                                                    <span className="mr-2 text-xl">🌙</span>
-                                                    <span className="font-semibold">Tarde</span>
-                                                </div>
-                                                <button onClick={() => editar(f, 'tarde')} className="text-blue-500 text-xl">✏️</button>
-                                            </div>
-                                            {editando === fs && turno === 'tarde' ? (
-                                                <div className="space-y-2">
-                                                    <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-2 border rounded" />
-                                                    <input type="text" value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="w-full p-2 border rounded" placeholder="Lugar" />
-                                                    <input type="text" value={form.conductor} onChange={(e) => setForm({ ...form, conductor: e.target.value })} className="w-full p-2 border rounded" placeholder="Conductor" />
-                                                    <input type="text" value={form.mapa} onChange={(e) => setForm({ ...form, mapa: e.target.value })} className="w-full p-2 border rounded" placeholder="Mapa" />
-                                                    <div className="flex gap-2">
-                                                        <button onClick={guardar} className="flex-1 bg-green-500 text-white py-2 rounded">Guardar</button>
-                                                        <button onClick={() => { setEditando(null); setTurno(null); }} className="flex-1 bg-gray-300 py-2 rounded">Cancelar</button>
-                                                    </div>
-                                                </div>
-                                            ) : st ? (
-                                                <div className="text-sm space-y-1">
-                                                    <p>⏰ {st.hora}</p>
-                                                    <p>📍 {st.lugar}</p>
-                                                    <p>👤 {st.conductor}</p>
-                                                    <p>📖 Mapa {st.mapa}</p>
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-400 text-sm">Sin programar</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            };
-
-            const Territorio = ({ territorio, saveTerritorio }) => {
-                const [zoom, setZoom] = useState(1);
-                const [pos, setPos] = useState({ x: 0, y: 0 });
-                const [dragging, setDragging] = useState(false);
-                const [start, setStart] = useState({ x: 0, y: 0 });
-
-                const handleFile = (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                            saveTerritorio(ev.target.result);
-                            setZoom(1);
-                            setPos({ x: 0, y: 0 });
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                };
-
-                return (
-                    <div className="p-6">
-                        <h2 className="text-2xl font-bold mb-6">Territorio de la Congregación</h2>
-                        {!territorio ? (
-                            <div className="bg-white rounded-lg p-8 shadow-md text-center">
-                                <div className="text-6xl mb-4">🗺️</div>
-                                <p className="text-gray-600 mb-4">No hay imagen del territorio cargada</p>
-                                <input type="file" accept="image/*" onChange={handleFile} className="hidden" id="territorio-upload" />
-                                <label htmlFor="territorio-upload" className="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-600">
-                                    Cargar Imagen
-                                </label>
-                            </div>
-                        ) : (
-                            <div>
-                                <div className="flex gap-2 mb-4">
-                                    <button onClick={() => setZoom(Math.max(0.5, zoom - 0.5))} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Zoom -</button>
-                                    <button onClick={() => { setZoom(1); setPos({ x: 0, y: 0 }); }} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Reset</button>
-                                    <button onClick={() => setZoom(Math.min(5, zoom + 0.5))} className="flex-1 bg-gray-200 py-2 rounded hover:bg-gray-300">Zoom +</button>
-                                </div>
-                                <div
-                                    className="bg-gray-100 rounded-lg overflow-hidden"
-                                    style={{ height: '400px', position: 'relative', touchAction: 'none' }}
-                                    onMouseMove={(e) => dragging && setPos({ x: e.clientX - start.x, y: e.clientY - start.y })}
-                                    onMouseUp={() => setDragging(false)}
-                                    onMouseLeave={() => setDragging(false)}
-                                    onTouchMove={(e) => {
-                                        if (dragging && e.touches.length > 0) {
-                                            const t = e.touches[0];
-                                            setPos({ x: t.clientX - start.x, y: t.clientY - start.y });
-                                        }
-                                    }}
-                                    onTouchEnd={() => setDragging(false)}
-                                >
-                                    <img
-                                        src={territorio}
-                                        alt="Territorio"
-                                        style={{
-                                            transform: `scale(${zoom}) translate(${pos.x / zoom}px, ${pos.y / zoom}px)`,
-                                            transformOrigin: '0 0',
-                                            cursor: dragging ? 'grabbing' : 'grab',
-                                            maxWidth: 'none',
-                                            userSelect: 'none'
-                                        }}
-                                        onMouseDown={(e) => {
-                                            setDragging(true);
-                                            setStart({ x: e.clientX - pos.x, y: e.clientY - pos.y });
-                                        }}
-                                        onTouchStart={(e) => {
-                                            const t = e.touches[0];
-                                            setDragging(true);
-                                            setStart({ x: t.clientX - pos.x, y: t.clientY - pos.y });
-                                        }}
-                                        draggable={false}
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => confirm('¿Cambiar imagen?') && document.getElementById('territorio-change').click()}
-                                    className="w-full mt-4 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
-                                >
-                                    Cambiar Imagen
-                                </button>
-                                <input type="file" accept="image/*" onChange={handleFile} className="hidden" id="territorio-change" />
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const Interesados = ({ interesados, saveInteresados }) => {
-                const [mostrar, setMostrar] = useState(false);
-                const [editId, setEditId] = useState(null);
-                const [form, setForm] = useState({
-                    nombre: '', direccion: '', fecha: '', horaPreferente: '', diaPreferente: '',
-                    numeroMapa: '', anotaciones: '', lat: '', lng: ''
-                });
-
-                const abrir = (int = null) => {
-                    if (int) {
-                        setForm(int);
-                        setEditId(int.id);
+                const abrir = (act = null) => {
+                    if (act) {
+                        setForm(act);
+                        setEditId(act.id);
                     } else {
-                        setForm({
-                            nombre: '', direccion: '', fecha: new Date().toISOString().split('T')[0],
-                            horaPreferente: '', diaPreferente: '', numeroMapa: '', anotaciones: '', lat: '', lng: ''
-                        });
+                        setForm({ fecha: '', hora: '', actividad: '', notas: '' });
                         setEditId(null);
                     }
                     setMostrar(true);
                 };
 
                 const guardar = () => {
-                    if (!form.nombre) return alert('El nombre es requerido');
+                    if (!form.fecha || !form.actividad) return alert('Fecha y actividad son requeridos');
                     let nuevo;
                     if (editId) {
-                        nuevo = interesados.map(i => i.id === editId ? { ...form, id: editId } : i);
+                        nuevo = agenda.map(a => a.id === editId ? { ...form, id: editId } : a);
                     } else {
-                        nuevo = [...interesados, { ...form, id: Date.now().toString() }];
+                        nuevo = [...agenda, { ...form, id: Date.now().toString() }];
                     }
-                    saveInteresados(nuevo);
+                    saveAgenda(nuevo);
                     setMostrar(false);
-                    alert('Interesado guardado');
                 };
 
                 const eliminar = (id) => {
-                    if (confirm('¿Eliminar?')) saveInteresados(interesados.filter(i => i.id !== id));
+                    if (confirm('¿Eliminar actividad?')) saveAgenda(agenda.filter(a => a.id !== id));
                 };
 
-                const abrirMapa = (lat, lng) => {
-                    if (lat && lng) window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
-                    else alert('No hay ubicación');
-                };
-
-                const getUbicacion = () => {
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                            (pos) => {
-                                setForm({ ...form, lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) });
-                                alert('Ubicación obtenida');
-                            },
-                            () => alert('No se pudo obtener ubicación')
-                        );
-                    } else {
-                        alert('Tu navegador no soporta geolocalización');
-                    }
+                const actividadesPorDia = (fecha) => {
+                    const fs = fecha.toISOString().split('T')[0];
+                    return agenda.filter(a => a.fecha === fs).sort((a, b) => a.hora.localeCompare(b.hora));
                 };
 
                 return (
                     <div className="p-6">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold">Interesados</h2>
-                            {!mostrar && (
-                                <button onClick={() => abrir()} className="bg-purple-500 text-white p-3 rounded-full shadow-lg hover:bg-purple-600 text-2xl">
-                                    ➕
-                                </button>
-                            )}
+                            <h2 className="text-2xl font-bold">📅 Mi Agenda</h2>
+                            <button onClick={() => abrir()} className="bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 text-2xl">
+                                ➕
+                            </button>
                         </div>
 
                         {mostrar ? (
                             <div className="bg-white rounded-lg p-6 shadow-md">
-                                <h3 className="text-xl font-bold mb-4">{editId ? 'Editar' : 'Nuevo'} Interesado</h3>
+                                <h3 className="text-xl font-bold mb-4">{editId ? 'Editar' : 'Nueva'} Actividad</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block font-semibold mb-2">Fecha *</label>
+                                        <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="w-full p-3 border rounded-lg" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Hora</label>
+                                        <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="w-full p-3 border rounded-lg" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Actividad *</label>
+                                        <input type="text" value={form.actividad} onChange={(e) => setForm({ ...form, actividad: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Ej: Visitar a Juan, Estudio bíblico..." />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Notas</label>
+                                        <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} className="w-full p-3 border rounded-lg" rows="3" placeholder="Detalles adicionales..."></textarea>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={guardar} className="flex-1 bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 font-semibold">💾 Guardar</button>
+                                        <button onClick={() => setMostrar(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {semana.map((f, i) => {
+                                    const acts = actividadesPorDia(f);
+                                    const esHoy = f.toDateString() === new Date().toDateString();
+                                    return (
+                                        <div key={i} className={`bg-white rounded-lg p-4 shadow-md ${esHoy ? 'border-2 border-orange-500' : ''}`}>
+                                            <h3 className="font-bold mb-3">{f.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}{esHoy && <span className="ml-2 text-orange-500 text-sm">(Hoy)</span>}</h3>
+                                            {acts.length === 0 ? (
+                                                <p className="text-gray-400 text-sm">Sin actividades programadas</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {acts.map(a => (
+                                                        <div key={a.id} className="bg-orange-50 rounded-lg p-3">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="flex-1">
+                                                                    <p className="font-semibold text-gray-800">{a.hora && `⏰ ${a.hora} - `}{a.actividad}</p>
+                                                                    {a.notas && <p className="text-sm text-gray-600 mt-1">{a.notas}</p>}
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => abrir(a)} className="text-blue-500">✏️</button>
+                                                                    <button onClick={() => eliminar(a.id)} className="text-red-500">🗑️</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+const Interesados = ({ interesados, saveInteresados }) => {
+                const [form, setForm] = useState({ nombre: '', direccion: '', telefono: '', fecha: '', horaPreferente: '', notas: '', id: null });
+                const [editando, setEditando] = useState(false);
+
+                const guardar = () => {
+                    if (!form.nombre) return alert('El nombre es requerido');
+                    let nuevo;
+                    if (form.id) {
+                        nuevo = interesados.map(i => i.id === form.id ? form : i);
+                    } else {
+                        nuevo = [...interesados, { ...form, id: Date.now().toString() }];
+                    }
+                    saveInteresados(nuevo);
+                    setForm({ nombre: '', direccion: '', telefono: '', fecha: '', horaPreferente: '', notas: '', id: null });
+                    setEditando(false);
+                };
+
+                const editar = (int) => {
+                    setForm(int);
+                    setEditando(true);
+                };
+
+                const eliminar = (id) => {
+                    if (confirm('¿Eliminar interesado?')) saveInteresados(interesados.filter(i => i.id !== id));
+                };
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">👥 Personas Interesadas</h2>
+                        {editando ? (
+                            <div className="bg-white rounded-lg p-6 shadow-md mb-6">
+                                <h3 className="text-xl font-bold mb-4">{form.id ? 'Editar' : 'Nuevo'} Interesado</h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block font-semibold mb-2">Nombre *</label>
-                                        <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Nombre" />
+                                        <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Nombre completo" />
                                     </div>
                                     <div>
                                         <label className="block font-semibold mb-2">Dirección</label>
-                                        <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Dirección" />
+                                        <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Dirección completa" />
                                     </div>
                                     <div>
-                                        <label className="block font-semibold mb-2">Fecha de Visita</label>
+                                        <label className="block font-semibold mb-2">Teléfono</label>
+                                        <input type="tel" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Número de teléfono" />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2">Próxima Visita</label>
                                         <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="w-full p-3 border rounded-lg" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block font-semibold mb-2">Día Preferente</label>
-                                            <select value={form.diaPreferente} onChange={(e) => setForm({ ...form, diaPreferente: e.target.value })} className="w-full p-3 border rounded-lg">
-                                                <option value="">Seleccionar</option>
-                                                <option value="Lunes">Lunes</option>
-                                                <option value="Martes">Martes</option>
-                                                <option value="Miércoles">Miércoles</option>
-                                                <option value="Jueves">Jueves</option>
-                                                <option value="Viernes">Viernes</option>
-                                                <option value="Sábado">Sábado</option>
-                                                <option value="Domingo">Domingo</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block font-semibold mb-2">Hora Preferente</label>
-<input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
+                                    <div>
+                                        <label className="block font-semibold mb-2">Hora Preferente</label>
+                                        <input type="time" value={form.horaPreferente} onChange={(e) => setForm({ ...form, horaPreferente: e.target.value })} className="w-full p-3 border rounded-lg" />
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block font-semibold mb-2">Número de Mapa</label>
-                                    <input type="text" value={form.numeroMapa} onChange={(e) => setForm({ ...form, numeroMapa: e.target.value })} className="w-full p-3 border rounded-lg" placeholder="Ej: A-12" />
-                                </div>
-                                <div>
-                                    <label className="block font-semibold mb-2">Ubicación (GPS)</label>
-                                    <div className="flex gap-2 mb-2">
-                                        <input type="text" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Latitud" />
-                                        <input type="text" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} className="flex-1 p-3 border rounded-lg" placeholder="Longitud" />
+                                    <div>
+                                        <label className="block font-semibold mb-2">Notas</label>
+                                        <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} className="w-full p-3 border rounded-lg" rows="4" placeholder="Observaciones, temas de interés, etc."></textarea>
                                     </div>
-                                    <button onClick={getUbicacion} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
-                                        📍 Usar Mi Ubicación Actual
-                                    </button>
-                                    <p className="text-xs text-gray-500 mt-2">💡 O copia las coordenadas desde Google Maps</p>
-                                </div>
-                                <div>
-                                    <label className="block font-semibold mb-2">Anotaciones</label>
-                                    <textarea value={form.anotaciones} onChange={(e) => setForm({ ...form, anotaciones: e.target.value })} className="w-full p-3 border rounded-lg" rows="4" placeholder="Notas..."></textarea>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={guardar} className="flex-1 bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 font-semibold">
-                                        💾 Guardar
-                                    </button>
-                                    <button onClick={() => setMostrar(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">
-                                        Cancelar
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button onClick={guardar} className="flex-1 bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 font-semibold">💾 Guardar</button>
+                                        <button onClick={() => { setEditando(false); setForm({ nombre: '', direccion: '', telefono: '', fecha: '', horaPreferente: '', notas: '', id: null }); }} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
+                        ) : (
+                            <button onClick={() => setEditando(true)} className="w-full bg-purple-500 text-white py-4 rounded-lg hover:bg-purple-600 mb-6 font-semibold text-lg">➕ Agregar Interesado</button>
+                        )}
+                        <div className="space-y-3">
                             {interesados.length === 0 ? (
                                 <div className="bg-gray-50 rounded-lg p-8 text-center">
-                                    <div className="text-6xl mb-4">👥</div>
                                     <p className="text-gray-600">No hay interesados registrados</p>
-                                    <p className="text-gray-500 text-sm mt-2">Presiona el botón + para agregar</p>
                                 </div>
                             ) : (
                                 interesados.map(int => (
                                     <div key={int.id} className="bg-white rounded-lg p-5 shadow-md">
                                         <div className="flex justify-between items-start mb-3">
-                                            <h3 className="text-lg font-bold">{int.nombre}</h3>
+                                            <h3 className="font-bold text-lg text-gray-800">{int.nombre}</h3>
                                             <div className="flex gap-2">
-                                                <button onClick={() => abrir(int)} className="text-blue-500">✏️</button>
-                                                <button onClick={() => eliminar(int.id)} className="text-red-500">🗑️</button>
+                                                <button onClick={() => editar(int)} className="text-blue-500 text-xl">✏️</button>
+                                                <button onClick={() => eliminar(int.id)} className="text-red-500 text-xl">🗑️</button>
                                             </div>
                                         </div>
-                                        <div className="space-y-2 text-sm text-gray-700">
-                                            {int.direccion && <p>📍 {int.direccion}</p>}
-                                            {int.fecha && <p>📅 {new Date(int.fecha + 'T00:00:00').toLocaleDateString('es-ES')}</p>}
-                                            {int.diaPreferente && <p>📆 {int.diaPreferente}{int.horaPreferente && ` - ${int.horaPreferente}`}</p>}
-                                            {int.numeroMapa && <p>📖 Mapa: {int.numeroMapa}</p>}
-                                            {int.anotaciones && <p className="mt-2 p-3 bg-gray-50 rounded">{int.anotaciones}</p>}
-                                            {int.lat && int.lng && (
-                                                <button onClick={() => abrirMapa(int.lat, int.lng)} className="w-full mt-2 bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                                                    🗺️ Ver en Google Maps
-                                                </button>
-                                            )}
-                                        </div>
+                                        {int.direccion && <p className="text-sm text-gray-600 mb-1">📍 {int.direccion}</p>}
+                                        {int.telefono && <p className="text-sm text-gray-600 mb-1">📞 {int.telefono}</p>}
+                                        {int.fecha && (
+                                            <div className="bg-purple-50 rounded p-2 mt-2">
+                                                <p className="text-sm font-semibold text-purple-700">
+                                                    📅 Próxima visita: {new Date(int.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                                    {int.horaPreferente && ` - ${int.horaPreferente}`}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {int.notas && (
+                                            <div className="mt-2 p-2 bg-gray-50 rounded">
+                                                <p className="text-sm text-gray-700">{int.notas}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             )}
                         </div>
-                    )}
+                    </div>
+                );
+            };
+
+            const Territorio = ({ territorio, saveTerritorio }) => {
+                const [edit, setEdit] = useState(false);
+                const [temp, setTemp] = useState(territorio || '');
+
+                const guardar = () => {
+                    saveTerritorio(temp);
+                    setEdit(false);
+                };
+
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">🗺️ Mi Territorio</h2>
+                        <div className="bg-white rounded-lg p-6 shadow-md">
+                            {edit ? (
+                                <div className="space-y-4">
+                                    <textarea value={temp} onChange={(e) => setTemp(e.target.value)} className="w-full p-3 border rounded-lg" rows="10" placeholder="Describe tu territorio, calles, límites, notas importantes..."></textarea>
+                                    <div className="flex gap-2">
+                                        <button onClick={guardar} className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">💾 Guardar</button>
+                                        <button onClick={() => { setEdit(false); setTemp(territorio || ''); }} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    {territorio ? (
+                                        <div className="whitespace-pre-wrap text-gray-700 mb-4">{territorio}</div>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-400 mb-4">No has registrado información de tu territorio</p>
+                                        </div>
+                                    )}
+                                    <button onClick={() => setEdit(true)} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">✏️ {territorio ? 'Editar' : 'Agregar'} Territorio</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-2xl mx-auto">
+                        <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow-lg">
+                            <h1 className="text-2xl font-bold">Mi Predicación</h1>
+                            <button onClick={() => setMenu(!menu)} className="text-3xl">☰</button>
+                        </header>
+
+                        {menu && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={() => setMenu(false)}>
+                                <div className="bg-white w-64 h-full shadow-lg p-6" onClick={(e) => e.stopPropagation()}>
+                                    <h2 className="text-xl font-bold mb-6">Menú</h2>
+                                    <nav className="space-y-3">
+                                        <button onClick={() => { setTab('inicio'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🏠 Inicio</button>
+                                        <button onClick={() => { setTab('registro-rapido'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">⏱️ Registro Rápido</button>
+                                        <button onClick={() => { setTab('informe'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">📊 Informe</button>
+                                        <button onClick={() => { setTab('agenda-semanal'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🚗 Salidas Semanales</button>
+                                        <button onClick={() => { setTab('agenda-actividades'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">📅 Mi Agenda</button>
+                                        <button onClick={() => { setTab('interesados'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">👥 Interesados</button>
+                                        <button onClick={() => { setTab('territorio'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🗺️ Territorio</button>
+                                    </nav>
+                                </div>
+                            </div>
+                        )}
+
+                        <main>
+                            {tab === 'inicio' && <Inicio nombre={nombre} foto={foto} salidas={salidas} informes={informes} interesados={interesados} metaMensual={metaMensual} setTab={setTab} editPerfil={editPerfil} setEditPerfil={setEditPerfil} savePerfil={savePerfil} />}
+                            {tab === 'registro-rapido' && <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />}
+                            {tab === 'informe' && <Informe informes={informes} saveInformes={saveInformes} metaAnual={metaAnual} metaMensual={metaMensual} saveMetas={saveMetas} />}
+                            {tab === 'agenda-semanal' && <AgendaSemanal salidas={salidas} saveSalidas={saveSalidas} />}
+                            {tab === 'agenda-actividades' && <AgendaActividades agenda={agenda} saveAgenda={saveAgenda} />}
+                            {tab === 'interesados' && <Interesados interesados={interesados} saveInteresados={saveInteresados} />}
+                            {tab === 'territorio' && <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />}
+                        </main>
+                    </div>
                 </div>
             );
         };
 
-        return (
-            <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 shadow-lg">
-                    <div className="flex justify-between items-center">
-                        <h1 className="text-xl font-bold">Mi Predicación</h1>
-                        <button onClick={() => setMenu(!menu)} className="p-2 hover:bg-blue-500 rounded">
-                            {menu ? '✕' : '☰'}
-                        </button>
-                    </div>
-                </div>
-
-                {menu && (
-                    <div className="bg-white shadow-lg">
-                        {[
-                            { name: 'Inicio', icon: '🏠', key: 'inicio' },
-                            { name: 'Mi Informe', icon: '📊', key: 'informe' },
-                            { name: 'Agenda Semanal', icon: '📅', key: 'agenda' },
-                            { name: 'Territorio', icon: '🗺️', key: 'territorio' },
-                            { name: 'Interesados', icon: '👥', key: 'interesados' }
-                        ].map(item => (
-                            <button
-                                key={item.key}
-                                onClick={() => { setTab(item.key); setMenu(false); }}
-                                className="w-full text-left p-4 hover:bg-gray-100 border-b flex items-center gap-3"
-                            >
-                                <span className="text-xl">{item.icon}</span>
-                                <span className="font-semibold">{item.name}</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                <div className="pb-6">
-                    {tab === 'inicio' && (
-                        <Inicio
-                            nombre={nombre}
-                            foto={foto}
-                            salidas={salidas}
-                            informes={informes}
-                            interesados={interesados}
-                            metaMensual={metaMensual}
-                            setTab={setTab}
-                            editPerfil={editPerfil}
-                            setEditPerfil={setEditPerfil}
-                            savePerfil={savePerfil}
-                        />
-                    )}
-                    {tab === 'registro-rapido' && (
-                        <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />
-                    )}
-                    {tab === 'informe' && (
-                        <Informe
-                            informes={informes}
-                            saveInformes={saveInformes}
-                            metaAnual={metaAnual}
-                            metaMensual={metaMensual}
-                            saveMetas={saveMetas}
-                        />
-                    )}
-                    {tab === 'agenda' && (
-                        <Agenda salidas={salidas} saveSalidas={saveSalidas} />
-                    )}
-                    {tab === 'territorio' && (
-                        <Territorio territorio={territorio} saveTerritorio={saveTerritorio} />
-                    )}
-                    {tab === 'interesados' && (
-                        <Interesados interesados={interesados} saveInteresados={saveInteresados} />
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    ReactDOM.render(<App />, document.getElementById('root'));
-</script>
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
 </body>
 </html>
