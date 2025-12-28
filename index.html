@@ -888,20 +888,24 @@ const Interesados = ({ interesados, saveInteresados }) => {
                 );
             };
 
-          const Territorio = ({ territorio, saveTerritorio }) => {
+         const Territorio = ({ territorio, saveTerritorio }) => {
     const [edit, setEdit] = useState(false);
-    const [temp, setTemp] = useState(territorio ? JSON.parse(territorio) : { texto: '', foto: null });
+    const [temp, setTemp] = useState({ texto: '', foto: null });
 
     useEffect(() => {
         if (territorio) {
             try {
                 const parsed = JSON.parse(territorio);
-                setTemp(parsed);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    setTemp(parsed);
+                } else {
+                    setTemp({ texto: territorio, foto: null });
+                }
             } catch {
                 setTemp({ texto: territorio, foto: null });
             }
         }
-    }, [territorio]);
+    }, [territorio, edit]);
 
     const handleFoto = (e) => {
         const file = e.target.files[0];
@@ -919,6 +923,20 @@ const Interesados = ({ interesados, saveInteresados }) => {
         setEdit(false);
     };
 
+    const cancelar = () => {
+        setEdit(false);
+        if (territorio) {
+            try {
+                const parsed = JSON.parse(territorio);
+                setTemp(typeof parsed === 'object' && parsed !== null ? parsed : { texto: territorio, foto: null });
+            } catch {
+                setTemp({ texto: territorio, foto: null });
+            }
+        } else {
+            setTemp({ texto: '', foto: null });
+        }
+    };
+
     return (
         <div className="p-6">
             <h2 className="text-2xl font-bold mb-6">🗺️ Mi Territorio</h2>
@@ -928,7 +946,7 @@ const Interesados = ({ interesados, saveInteresados }) => {
                         <div>
                             <label className="block font-semibold mb-2">Descripción del Territorio</label>
                             <textarea 
-                                value={temp.texto} 
+                                value={temp.texto || ''} 
                                 onChange={(e) => setTemp({ ...temp, texto: e.target.value })} 
                                 className="w-full p-3 border rounded-lg" 
                                 rows="8" 
@@ -949,12 +967,12 @@ const Interesados = ({ interesados, saveInteresados }) => {
                         </div>
                         <div className="flex gap-2">
                             <button onClick={guardar} className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">💾 Guardar</button>
-                            <button onClick={() => { setEdit(false); setTemp(territorio ? JSON.parse(territorio) : { texto: '', foto: null }); }} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
+                            <button onClick={cancelar} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
                         </div>
                     </div>
                 ) : (
                     <div>
-                        {temp.texto || temp.foto ? (
+                        {(temp.texto || temp.foto) ? (
                             <div>
                                 {temp.foto && (
                                     <div className="mb-4">
@@ -971,7 +989,7 @@ const Interesados = ({ interesados, saveInteresados }) => {
                             </div>
                         )}
                         <button onClick={() => setEdit(true)} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
-                            ✏️ {temp.texto || temp.foto ? 'Editar' : 'Agregar'} Territorio
+                            ✏️ {(temp.texto || temp.foto) ? 'Editar' : 'Agregar'} Territorio
                         </button>
                     </div>
                 )}
@@ -984,4 +1002,5 @@ const Interesados = ({ interesados, saveInteresados }) => {
     </script>
 </body>
 </html>
+
 
