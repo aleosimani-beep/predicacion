@@ -888,114 +888,69 @@ const Interesados = ({ interesados, saveInteresados }) => {
                 );
             };
 
-     const Territorio = ({ territorio, saveTerritorio }) => {
-    const [edit, setEdit] = useState(false);
-    const [temp, setTemp] = useState({ texto: '', foto: null });
+            const Territorio = ({ territorio, saveTerritorio }) => {
+                const [edit, setEdit] = useState(false);
+                const [temp, setTemp] = useState(territorio || '');
 
-    useEffect(() => {
-        if (territorio) {
-            try {
-                const parsed = JSON.parse(territorio);
-                if (typeof parsed === 'object' && parsed !== null) {
-                    setTemp(parsed);
-                } else {
-                    setTemp({ texto: territorio, foto: null });
-                }
-            } catch {
-                setTemp({ texto: territorio, foto: null });
-            }
-        }
-    }, [territorio, edit]);
+                const guardar = () => {
+                    saveTerritorio(temp);
+                    setEdit(false);
+                };
 
-    const handleFoto = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                setTemp({ ...temp, foto: ev.target.result });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const guardar = () => {
-        saveTerritorio(JSON.stringify(temp));
-        setEdit(false);
-    };
-
-    const cancelar = () => {
-        setEdit(false);
-        if (territorio) {
-            try {
-                const parsed = JSON.parse(territorio);
-                setTemp(typeof parsed === 'object' && parsed !== null ? parsed : { texto: territorio, foto: null });
-            } catch {
-                setTemp({ texto: territorio, foto: null });
-            }
-        } else {
-            setTemp({ texto: '', foto: null });
-        }
-    };
-
-    return (
-        <div className="p-6">
-            <h2 className="text-2xl font-bold mb-6">🗺️ Mi Territorio</h2>
-            <div className="bg-white rounded-lg p-6 shadow-md">
-                {edit ? (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block font-semibold mb-2">Descripción del Territorio</label>
-                            <textarea 
-                                value={temp.texto || ''} 
-                                onChange={(e) => setTemp({ ...temp, texto: e.target.value })} 
-                                className="w-full p-3 border rounded-lg" 
-                                rows="8" 
-                                placeholder="Describe tu territorio, calles, límites, notas importantes..."
-                            ></textarea>
-                        </div>
-                        <div>
-                            <label className="block font-semibold mb-2">Foto del Mapa 📷</label>
-                            {temp.foto && (
-                                <div className="mb-3">
-                                    <img src={temp.foto} alt="Mapa" className="w-full rounded-lg border" />
+                return (
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-6">🗺️ Mi Territorio</h2>
+                        <div className="bg-white rounded-lg p-6 shadow-md">
+                            {edit ? (
+                                <div className="space-y-4">
+                                    <textarea value={temp} onChange={(e) => setTemp(e.target.value)} className="w-full p-3 border rounded-lg" rows="10" placeholder="Describe tu territorio, calles, límites, notas importantes..."></textarea>
+                                    <div className="flex gap-2">
+                                        <button onClick={guardar} className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">💾 Guardar</button>
+                                        <button onClick={() => { setEdit(false); setTemp(territorio || ''); }} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    {territorio ? (
+                                        <div className="whitespace-pre-wrap text-gray-700 mb-4">{territorio}</div>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-400 mb-4">No has registrado información de tu territorio</p>
+                                        </div>
+                                    )}
+                                    <button onClick={() => setEdit(true)} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">✏️ {territorio ? 'Editar' : 'Agregar'} Territorio</button>
                                 </div>
                             )}
-                            <input type="file" accept="image/*" onChange={handleFoto} className="hidden" id="foto-territorio" />
-                            <label htmlFor="foto-territorio" className="block w-full p-3 border-2 border-dashed rounded-lg text-center cursor-pointer hover:bg-gray-50">
-                                {temp.foto ? '🔄 Cambiar Foto' : '📷 Subir Foto del Mapa'}
-                            </label>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={guardar} className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">💾 Guardar</button>
-                            <button onClick={cancelar} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 font-semibold">Cancelar</button>
                         </div>
                     </div>
-                ) : (
-                    <div>
-                        {(temp.texto || temp.foto) ? (
-                            <div>
-                                {temp.foto && (
-                                    <div className="mb-4">
-                                        <img src={temp.foto} alt="Mapa del territorio" className="w-full rounded-lg border shadow-sm" />
-                                    </div>
-                                )}
-                                {temp.texto && (
-                                    <div className="whitespace-pre-wrap text-gray-700 mb-4">{temp.texto}</div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="text-center py-8">
-                                <p className="text-gray-400 mb-4">No has registrado información de tu territorio</p>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-2xl mx-auto">
+                        <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow-lg">
+                            <h1 className="text-2xl font-bold">Mi Predicación</h1>
+                            <button onClick={() => setMenu(!menu)} className="text-3xl">☰</button>
+                        </header>
+
+                        {menu && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={() => setMenu(false)}>
+                                <div className="bg-white w-64 h-full shadow-lg p-6" onClick={(e) => e.stopPropagation()}>
+                                    <h2 className="text-xl font-bold mb-6">Menú</h2>
+                                    <nav className="space-y-3">
+                                        <button onClick={() => { setTab('inicio'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🏠 Inicio</button>
+                                        <button onClick={() => { setTab('registro-rapido'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">⏱️ Registro Rápido</button>
+                                        <button onClick={() => { setTab('informe'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">📊 Informe</button>
+                                        <button onClick={() => { setTab('agenda-semanal'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🚗 Salidas Semanales</button>
+                                        <button onClick={() => { setTab('agenda-actividades'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">📅 Mi Agenda</button>
+                                        <button onClick={() => { setTab('interesados'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">👥 Interesados</button>
+                                        <button onClick={() => { setTab('territorio'); setMenu(false); }} className="w-full text-left p-3 rounded-lg hover:bg-gray-100">🗺️ Territorio</button>
+                                    </nav>
+                                </div>
                             </div>
                         )}
-                        <button onClick={() => setEdit(true)} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold">
-                            ✏️ {(temp.texto || temp.foto) ? 'Editar' : 'Agregar'} Territorio
-                        </button>
-                    </div>
-            </div>
-        </div>
-    );
-};
+
                         <main>
                             {tab === 'inicio' && <Inicio nombre={nombre} foto={foto} salidas={salidas} informes={informes} interesados={interesados} metaMensual={metaMensual} setTab={setTab} editPerfil={editPerfil} setEditPerfil={setEditPerfil} savePerfil={savePerfil} />}
                             {tab === 'registro-rapido' && <RegistroRapido informes={informes} saveInformes={saveInformes} setTab={setTab} />}
@@ -1013,7 +968,4 @@ const Interesados = ({ interesados, saveInteresados }) => {
         ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
-</html>   
-
-
-
+</html>
